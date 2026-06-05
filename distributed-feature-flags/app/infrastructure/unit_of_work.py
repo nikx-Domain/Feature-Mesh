@@ -10,6 +10,14 @@ from app.domain.unit_of_work import UnitOfWork
 from app.infrastructure.repositories.environment_repository import (
     SQLAlchemyEnvironmentRepository,
 )
+from app.infrastructure.repositories.feature_flag_repository import (
+    SQLAlchemyAuditEventRepository,
+    SQLAlchemyFeatureFlagEnvironmentRepository,
+    SQLAlchemyFeatureFlagRepository,
+    SQLAlchemyFlagVariationRepository,
+    SQLAlchemyRolloutRuleRepository,
+    SQLAlchemyTargetingRuleRepository,
+)
 from app.infrastructure.repositories.organization_repository import (
     SQLAlchemyOrganizationRepository,
 )
@@ -28,6 +36,12 @@ class SQLAlchemyUnitOfWork(UnitOfWork):
         self._organizations = SQLAlchemyOrganizationRepository(session)
         self._projects = SQLAlchemyProjectRepository(session)
         self._environments = SQLAlchemyEnvironmentRepository(session)
+        self._feature_flags = SQLAlchemyFeatureFlagRepository(session)
+        self._flag_variations = SQLAlchemyFlagVariationRepository(session)
+        self._feature_flag_environments = SQLAlchemyFeatureFlagEnvironmentRepository(session)
+        self._targeting_rules = SQLAlchemyTargetingRuleRepository(session)
+        self._rollout_rules = SQLAlchemyRolloutRuleRepository(session)
+        self._audit_events = SQLAlchemyAuditEventRepository(session)
 
     @property
     def users(self) -> UserRepository:
@@ -44,6 +58,30 @@ class SQLAlchemyUnitOfWork(UnitOfWork):
     @property
     def environments(self) -> EnvironmentRepository:
         return self._environments
+
+    @property
+    def feature_flags(self):
+        return self._feature_flags
+
+    @property
+    def flag_variations(self):
+        return self._flag_variations
+
+    @property
+    def feature_flag_environments(self):
+        return self._feature_flag_environments
+
+    @property
+    def targeting_rules(self):
+        return self._targeting_rules
+
+    @property
+    def rollout_rules(self):
+        return self._rollout_rules
+
+    @property
+    def audit_events(self):
+        return self._audit_events
 
 
     async def __aenter__(self) -> "SQLAlchemyUnitOfWork":

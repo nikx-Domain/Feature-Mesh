@@ -20,6 +20,11 @@ class SQLAlchemyRepository(Repository[T, ID], Generic[T, ID]):
     async def add(self, entity: T) -> None:
         self.session.add(entity)
 
+    async def update(self, entity: T) -> None:
+        # For pure SQLAlchemy models, the session tracks changes automatically.
+        # This method is mostly for explicitly merging or when using pure domain entities.
+        pass
+
     async def get_by_id(self, id: ID) -> T | None:
         return await self.session.get(self.model_class, id)
 

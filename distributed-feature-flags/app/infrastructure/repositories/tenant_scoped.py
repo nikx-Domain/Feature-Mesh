@@ -46,4 +46,4 @@ class TenantScopedRepository(Repository[T, ID], Generic[T, ID]):
         return list(result.scalars().all())
 
     async def delete(self, entity: T) -> None:
-        self.session.delete(entity)
+        await self.session.delete(entity)

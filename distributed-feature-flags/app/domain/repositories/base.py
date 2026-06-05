@@ -15,6 +15,11 @@ class Repository(ABC, Generic[T, ID]):
         pass
 
     @abstractmethod
+    async def update(self, entity: T) -> None:
+        """Update an existing entity in the persistence context."""
+        pass
+
+    @abstractmethod
     async def get_by_id(self, id: ID) -> T | None:
         """Retrieve an entity by its unique identifier."""
         pass

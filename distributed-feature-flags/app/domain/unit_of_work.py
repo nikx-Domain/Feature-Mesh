@@ -1,8 +1,15 @@
 from abc import ABC, abstractmethod
 from types import TracebackType
-from typing import Any
 
 from app.domain.repositories.environment_repository import EnvironmentRepository
+from app.domain.repositories.feature_flag_repository import (
+    AuditEventRepository,
+    FeatureFlagEnvironmentRepository,
+    FeatureFlagRepository,
+    FlagVariationRepository,
+    RolloutRuleRepository,
+    TargetingRuleRepository,
+)
 from app.domain.repositories.organization_repository import OrganizationRepository
 from app.domain.repositories.project_repository import ProjectRepository
 from app.domain.repositories.user_repository import UserRepository
@@ -29,6 +36,36 @@ class UnitOfWork(ABC):
     @property
     @abstractmethod
     def environments(self) -> EnvironmentRepository:
+        pass
+
+    @property
+    @abstractmethod
+    def feature_flags(self) -> FeatureFlagRepository:
+        pass
+
+    @property
+    @abstractmethod
+    def flag_variations(self) -> FlagVariationRepository:
+        pass
+
+    @property
+    @abstractmethod
+    def feature_flag_environments(self) -> FeatureFlagEnvironmentRepository:
+        pass
+
+    @property
+    @abstractmethod
+    def targeting_rules(self) -> TargetingRuleRepository:
+        pass
+
+    @property
+    @abstractmethod
+    def rollout_rules(self) -> RolloutRuleRepository:
+        pass
+
+    @property
+    @abstractmethod
+    def audit_events(self) -> AuditEventRepository:
         pass
 
     async def __aenter__(self) -> "UnitOfWork":

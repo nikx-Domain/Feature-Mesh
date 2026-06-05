@@ -1,5 +1,4 @@
 import uuid
-from typing import Any
 
 from app.domain.unit_of_work import UnitOfWork
 from app.infrastructure.db.models import Organization, OrgRole, User, UserOrganization

@@ -1,6 +1,8 @@
 class DomainException(Exception):
     """Base class for all domain exceptions."""
-    pass
+    def __init__(self, message: str = "A domain error occurred"):
+        self.message = message
+        super().__init__(self.message)
 
 
 class EntityNotFoundException(DomainException):

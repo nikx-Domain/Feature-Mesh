@@ -1,4 +1,3 @@
-import uuid
 
 from app.core.security import hash_password
 from app.domain.exceptions import EntityAlreadyExistsException
