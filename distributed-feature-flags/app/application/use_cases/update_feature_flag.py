@@ -1,22 +1,20 @@
 import uuid
 
 from app.domain.entities import (
-    ActionType,
-    AuditEventEntity,
-    EntityType,
     FeatureFlagEntity,
+    OutboxEventEntity,
+    OutboxStatus,
 )
+from app.domain.events import FlagUpdatedEvent
 from app.domain.exceptions import EntityNotFoundException
-from app.domain.services.cache_service import CacheService
 from app.domain.unit_of_work import UnitOfWork
 
 
 class UpdateFeatureFlagUseCase:
     """Use case to handle updating a feature flag's basic properties."""
 
-    def __init__(self, uow: UnitOfWork, cache_service: CacheService) -> None:
+    def __init__(self, uow: UnitOfWork) -> None:
         self.uow = uow
-        self.cache_service = cache_service
 
     async def execute(
         self,
@@ -46,25 +44,27 @@ class UpdateFeatureFlagUseCase:
                 flag.version += 1
                 await self.uow.feature_flags.update(flag)
 
-                # Audit Event
-                audit = AuditEventEntity(
-                    organization_id=organization_id,
+                # Domain Event
+                event_dto = FlagUpdatedEvent(
+                    aggregate_id=flag.id,
+                    flag_key=flag.key,
+                    version=flag.version,
                     user_id=user_id,
-                    entity_type=EntityType.FEATURE_FLAG,
-                    entity_id=flag.id,
-                    action=ActionType.UPDATED,
+                    organization_id=organization_id,
                     previous_state=previous_state,
-                    new_state={"name": flag.name, "description": flag.description, "version": flag.version},
+                    new_state={"name": flag.name, "description": flag.description},
                 )
-                await self.uow.audit_events.add(audit)
+
+                # Outbox Event
+                outbox_event = OutboxEventEntity(
+                    aggregate_type="feature_flag",
+                    aggregate_id=str(flag.id),
+                    event_type=event_dto.event_type,
+                    payload=event_dto.model_dump(mode="json"),
+                    status=OutboxStatus.PENDING,
+                )
+                await self.uow.outbox_events.add(outbox_event)
 
             await self.uow.commit()
-
-            if new_state:
-                try:
-                    await self.cache_service.delete_pattern(f"eval_ptr:*:{flag.key}")
-                    await self.cache_service.delete_pattern(f"eval_data:*:{flag.key}:*")
-                except Exception:
-                    pass
 
             return flag

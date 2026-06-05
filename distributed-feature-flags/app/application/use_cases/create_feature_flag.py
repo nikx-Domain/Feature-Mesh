@@ -1,14 +1,14 @@
 import uuid
 
 from app.domain.entities import (
-    ActionType,
-    AuditEventEntity,
-    EntityType,
     FeatureFlagEntity,
     FeatureFlagEnvironmentEntity,
     FlagType,
     FlagVariationEntity,
+    OutboxEventEntity,
+    OutboxStatus,
 )
+from app.domain.events import FlagCreatedEvent
 from app.domain.exceptions import EntityAlreadyExistsException
 from app.domain.unit_of_work import UnitOfWork
 
@@ -67,16 +67,27 @@ class CreateFeatureFlagUseCase:
                 )
                 await self.uow.feature_flag_environments.add(state)
 
-            # 5. Audit Event
-            audit = AuditEventEntity(
-                organization_id=organization_id,
+            # 5. Domain Event & Outbox
+            event_dto = FlagCreatedEvent(
+                aggregate_id=flag.id,
+                flag_key=flag.key,
+                version=flag.version,
                 user_id=user_id,
-                entity_type=EntityType.FEATURE_FLAG,
-                entity_id=flag.id,
-                action=ActionType.CREATED,
-                new_state={"name": name, "key": key, "type": flag_type.value},
+                organization_id=organization_id,
+                project_id=flag.project_id,
+                name=flag.name,
+                description=flag.description,
+                flag_type=flag.type,
             )
-            await self.uow.audit_events.add(audit)
+
+            outbox_event = OutboxEventEntity(
+                aggregate_type="feature_flag",
+                aggregate_id=str(flag.id),
+                event_type=event_dto.event_type,
+                payload=event_dto.model_dump(mode="json"),
+                status=OutboxStatus.PENDING,
+            )
+            await self.uow.outbox_events.add(outbox_event)
 
             # Single commit at the end ensures atomicity
             await self.uow.commit()

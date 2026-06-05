@@ -9,6 +9,12 @@ from sqlalchemy.sql import text
 from app.core.config import settings
 from app.core.dependencies import get_db
 from app.core.logging import setup_logging
+from app.core.database import async_session_maker
+from app.infrastructure.kafka.client import close_kafka_producer, init_kafka_producer
+from app.infrastructure.background.outbox_publisher import outbox_publisher
+from app.infrastructure.kafka.consumers.cache_consumer import CacheInvalidationConsumer
+from app.infrastructure.kafka.consumers.audit_consumer import AuditConsumer
+from app.domain.services.cache_service import CacheService
 from app.infrastructure.redis.client import close_redis, get_redis_client, init_redis
 from app.presentation.api.auth import router as auth_router
 from app.presentation.api.cache import router as cache_router
@@ -22,10 +28,33 @@ from app.presentation.middleware.authorization import JWTAuthorizationMiddleware
 setup_logging()
 logger = structlog.get_logger(__name__)
 
+cache_consumer: CacheInvalidationConsumer | None = None
+audit_consumer: AuditConsumer | None = None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global cache_consumer, audit_consumer
     await init_redis()
+    await init_kafka_producer()
+    await outbox_publisher.start()
+
+    redis_client = get_redis_client()
+    cache_service = CacheService(redis_client)
+    cache_consumer = CacheInvalidationConsumer(cache_service)
+    audit_consumer = AuditConsumer(async_session_maker)
+
+    await cache_consumer.start()
+    await audit_consumer.start()
+
     yield
+
+    if cache_consumer:
+        await cache_consumer.stop()
+    if audit_consumer:
+        await audit_consumer.stop()
+    
+    await outbox_publisher.stop()
+    await close_kafka_producer()
     await close_redis()
 
 app = FastAPI(

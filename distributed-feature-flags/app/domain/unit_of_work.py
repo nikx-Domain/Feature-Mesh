@@ -13,6 +13,7 @@ from app.domain.repositories.feature_flag_repository import (
 from app.domain.repositories.organization_repository import OrganizationRepository
 from app.domain.repositories.project_repository import ProjectRepository
 from app.domain.repositories.user_repository import UserRepository
+from app.domain.repositories.outbox_repository import OutboxEventRepository
 
 
 class UnitOfWork(ABC):
@@ -66,6 +67,11 @@ class UnitOfWork(ABC):
     @property
     @abstractmethod
     def audit_events(self) -> AuditEventRepository:
+        pass
+
+    @property
+    @abstractmethod
+    def outbox_events(self) -> OutboxEventRepository:
         pass
 
     async def __aenter__(self) -> "UnitOfWork":

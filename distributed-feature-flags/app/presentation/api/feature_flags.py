@@ -12,10 +12,9 @@ from app.application.use_cases.create_feature_flag import CreateFeatureFlagUseCa
 from app.application.use_cases.list_audit_events import ListAuditEventsUseCase
 from app.application.use_cases.toggle_feature_flag import ToggleFeatureFlagUseCase
 from app.application.use_cases.update_feature_flag import UpdateFeatureFlagUseCase
-from app.core.dependencies import get_cache_service, get_db, get_uow
+from app.core.dependencies import get_db, get_uow
 from app.domain.entities import FlagType
 from app.domain.exceptions import EntityNotFoundException
-from app.domain.services.cache_service import CacheService
 from app.infrastructure.db.models import (
     Environment,
     Organization,
@@ -174,11 +173,10 @@ async def update_feature_flag(
     tenant: Organization = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db),
     uow: SQLAlchemyUnitOfWork = Depends(get_uow),
-    cache_service: CacheService = Depends(get_cache_service),
 ):
     """Update basic properties of a feature flag."""
     await verify_project_access(project_id, tenant.id, db)
-    use_case = UpdateFeatureFlagUseCase(uow, cache_service)
+    use_case = UpdateFeatureFlagUseCase(uow)
     flag = await use_case.execute(
         flag_id=flag_id,
         organization_id=tenant.id,
@@ -201,11 +199,10 @@ async def archive_feature_flag(
     tenant: Organization = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db),
     uow: SQLAlchemyUnitOfWork = Depends(get_uow),
-    cache_service: CacheService = Depends(get_cache_service),
 ):
     """Soft-delete (archive) a feature flag."""
     await verify_project_access(project_id, tenant.id, db)
-    use_case = ArchiveFeatureFlagUseCase(uow, cache_service)
+    use_case = ArchiveFeatureFlagUseCase(uow)
     flag = await use_case.execute(
         flag_id=flag_id,
         organization_id=tenant.id,
@@ -227,11 +224,10 @@ async def toggle_feature_flag(
     tenant: Organization = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db),
     uow: SQLAlchemyUnitOfWork = Depends(get_uow),
-    cache_service: CacheService = Depends(get_cache_service),
 ):
     """Enable or disable a feature flag in a specific environment."""
     await verify_environment_access(environment_id, tenant.id, db)
-    use_case = ToggleFeatureFlagUseCase(uow, cache_service)
+    use_case = ToggleFeatureFlagUseCase(uow)
     state = await use_case.execute(
         feature_flag_id=flag_id,
         environment_id=environment_id,

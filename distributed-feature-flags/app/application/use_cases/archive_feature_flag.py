@@ -1,22 +1,20 @@
 import uuid
 
 from app.domain.entities import (
-    ActionType,
-    AuditEventEntity,
-    EntityType,
     FeatureFlagEntity,
+    OutboxEventEntity,
+    OutboxStatus,
 )
+from app.domain.events import FlagArchivedEvent
 from app.domain.exceptions import EntityNotFoundException
-from app.domain.services.cache_service import CacheService
 from app.domain.unit_of_work import UnitOfWork
 
 
 class ArchiveFeatureFlagUseCase:
     """Use case to handle soft-deleting (archiving) a feature flag."""
 
-    def __init__(self, uow: UnitOfWork, cache_service: CacheService) -> None:
+    def __init__(self, uow: UnitOfWork) -> None:
         self.uow = uow
-        self.cache_service = cache_service
 
     async def execute(
         self,
@@ -34,28 +32,25 @@ class ArchiveFeatureFlagUseCase:
                 flag.version += 1
                 await self.uow.feature_flags.update(flag)
 
-                # Audit Event
-                audit = AuditEventEntity(
-                    organization_id=organization_id,
+                # Domain Event
+                event_dto = FlagArchivedEvent(
+                    aggregate_id=flag.id,
+                    flag_key=flag.key,
+                    version=flag.version,
                     user_id=user_id,
-                    entity_type=EntityType.FEATURE_FLAG,
-                    entity_id=flag.id,
-                    action=ActionType.ARCHIVED,
-                    previous_state={"is_archived": False},
-                    new_state={"is_archived": True, "version": flag.version},
+                    organization_id=organization_id,
                 )
-                await self.uow.audit_events.add(audit)
+
+                # Outbox Event
+                outbox_event = OutboxEventEntity(
+                    aggregate_type="feature_flag",
+                    aggregate_id=str(flag.id),
+                    event_type=event_dto.event_type,
+                    payload=event_dto.model_dump(mode="json"),
+                    status=OutboxStatus.PENDING,
+                )
+                await self.uow.outbox_events.add(outbox_event)
 
             await self.uow.commit()
-
-            if not flag.is_archived: # Wait, we just set it to True! We should check if we DID archive it.
-                pass
-
-            # Since we just archived it, let's unconditionally invalidate.
-            try:
-                await self.cache_service.delete_pattern(f"eval_ptr:*:{flag.key}")
-                await self.cache_service.delete_pattern(f"eval_data:*:{flag.key}:*")
-            except Exception:
-                pass
 
             return flag

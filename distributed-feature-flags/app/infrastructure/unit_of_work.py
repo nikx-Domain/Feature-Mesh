@@ -10,6 +10,7 @@ from app.domain.unit_of_work import UnitOfWork
 from app.infrastructure.repositories.environment_repository import (
     SQLAlchemyEnvironmentRepository,
 )
+from app.infrastructure.repositories.outbox_repository import SQLAlchemyOutboxEventRepository
 from app.infrastructure.repositories.feature_flag_repository import (
     SQLAlchemyAuditEventRepository,
     SQLAlchemyFeatureFlagEnvironmentRepository,
@@ -42,6 +43,7 @@ class SQLAlchemyUnitOfWork(UnitOfWork):
         self._targeting_rules = SQLAlchemyTargetingRuleRepository(session)
         self._rollout_rules = SQLAlchemyRolloutRuleRepository(session)
         self._audit_events = SQLAlchemyAuditEventRepository(session)
+        self._outbox_events = SQLAlchemyOutboxEventRepository(session)
 
     @property
     def users(self) -> UserRepository:
@@ -82,6 +84,10 @@ class SQLAlchemyUnitOfWork(UnitOfWork):
     @property
     def audit_events(self):
         return self._audit_events
+
+    @property
+    def outbox_events(self):
+        return self._outbox_events
 
 
     async def __aenter__(self) -> "SQLAlchemyUnitOfWork":

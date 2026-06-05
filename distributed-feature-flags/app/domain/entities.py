@@ -25,6 +25,12 @@ class EntityType(str, Enum):
     FEATURE_FLAG_ENVIRONMENT = "feature_flag_environment"
 
 
+class OutboxStatus(str, Enum):
+    PENDING = "pending"
+    PROCESSED = "processed"
+    FAILED = "failed"
+
+
 class TargetingOperator(str, Enum):
     EQUALS = "equals"
     NOT_EQUALS = "not_equals"
@@ -119,4 +125,21 @@ class AuditEventEntity(DomainEntity):
     action: ActionType
     previous_state: dict[str, Any] | None = None
     new_state: dict[str, Any] | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class OutboxEventEntity(DomainEntity):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    aggregate_type: str
+    aggregate_id: str
+    event_type: str
+    payload: dict[str, Any]
+    status: OutboxStatus = OutboxStatus.PENDING
+    retry_count: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    processed_at: datetime | None = None
+
+
+class ProcessedKafkaEventEntity(DomainEntity):
+    event_id: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

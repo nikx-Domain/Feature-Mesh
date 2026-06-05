@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # Redis Cache
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # Kafka
+    KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
+
     # JWT Settings
     JWT_SECRET: str = "super_secret_jwt_signing_key_change_me_in_production"
 

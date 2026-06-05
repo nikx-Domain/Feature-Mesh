@@ -1,22 +1,20 @@
 import uuid
 
 from app.domain.entities import (
-    ActionType,
-    AuditEventEntity,
-    EntityType,
     FeatureFlagEnvironmentEntity,
+    OutboxEventEntity,
+    OutboxStatus,
 )
+from app.domain.events import FlagToggledEvent
 from app.domain.exceptions import DomainException, EntityNotFoundException
-from app.domain.services.cache_service import CacheService
 from app.domain.unit_of_work import UnitOfWork
 
 
 class ToggleFeatureFlagUseCase:
     """Use case to handle enabling or disabling a feature flag in a specific environment."""
 
-    def __init__(self, uow: UnitOfWork, cache_service: CacheService) -> None:
+    def __init__(self, uow: UnitOfWork) -> None:
         self.uow = uow
-        self.cache_service = cache_service
 
     async def execute(
         self,
@@ -44,26 +42,27 @@ class ToggleFeatureFlagUseCase:
                 state.version += 1
                 await self.uow.feature_flag_environments.update(state)
 
-                # Audit Event
-                action = ActionType.ENABLED if is_enabled else ActionType.DISABLED
-                audit = AuditEventEntity(
-                    organization_id=organization_id,
+                # Domain Event
+                event_dto = FlagToggledEvent(
+                    aggregate_id=flag.id,
+                    flag_key=flag.key,
+                    version=state.version,
                     user_id=user_id,
-                    entity_type=EntityType.FEATURE_FLAG_ENVIRONMENT,
-                    entity_id=state.id,
-                    action=action,
-                    previous_state={"is_enabled": previous_enabled},
-                    new_state={"is_enabled": is_enabled, "version": state.version},
+                    organization_id=organization_id,
+                    environment_id=environment_id,
+                    is_enabled=is_enabled,
                 )
-                await self.uow.audit_events.add(audit)
+
+                # Outbox Event
+                outbox_event = OutboxEventEntity(
+                    aggregate_type="feature_flag",
+                    aggregate_id=str(flag.id),
+                    event_type=event_dto.event_type,
+                    payload=event_dto.model_dump(mode="json"),
+                    status=OutboxStatus.PENDING,
+                )
+                await self.uow.outbox_events.add(outbox_event)
 
             await self.uow.commit()
-
-            if state.is_enabled != is_enabled:
-                try:
-                    await self.cache_service.delete(f"eval_ptr:{environment_id}:{flag.key}")
-                    await self.cache_service.delete_pattern(f"eval_data:{environment_id}:{flag.key}:*")
-                except Exception:
-                    pass
 
             return state
