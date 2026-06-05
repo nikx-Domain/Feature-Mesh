@@ -26,6 +26,9 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://postgres:postgres_secure_password@localhost:5432/feature_flags"
     )
 
+    # Redis Cache
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     # JWT Settings
     JWT_SECRET: str = "super_secret_jwt_signing_key_change_me_in_production"
 

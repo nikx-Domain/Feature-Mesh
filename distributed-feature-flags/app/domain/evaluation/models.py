@@ -26,3 +26,4 @@ class EvaluationDecision(BaseModel):
     variation_id: uuid.UUID | None
     variation_value: Any
     reason: EvaluationReason
+    metadata: dict[str, Any] = Field(default_factory=dict)

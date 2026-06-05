@@ -1,3 +1,5 @@
+import time
+
 from app.domain.entities import (
     FeatureFlagEntity,
     FeatureFlagEnvironmentEntity,
@@ -23,6 +25,19 @@ def evaluate_feature_flag(
     
     Returns an EvaluationDecision indicating the assigned variation and the reason.
     """
+    start_time = time.perf_counter()
+    decision = _evaluate_internal(flag, environment, variations, context)
+    duration_ms = (time.perf_counter() - start_time) * 1000
+    decision.metadata["duration_ms"] = round(duration_ms, 3)
+    return decision
+
+
+def _evaluate_internal(
+    flag: FeatureFlagEntity,
+    environment: FeatureFlagEnvironmentEntity,
+    variations: list[FlagVariationEntity],
+    context: EvaluationContext,
+) -> EvaluationDecision:
     variation_map = {v.id: v for v in variations}
 
     # 1. Check if the flag environment is disabled
@@ -57,7 +72,8 @@ def evaluate_feature_flag(
     if environment.rollout_rules:
         bucket = get_rollout_bucket(flag.key, context.key)
         cumulative = 0
-        for rollout_rule in environment.rollout_rules:
+        sorted_rollout = sorted(environment.rollout_rules, key=lambda r: str(r.id))
+        for rollout_rule in sorted_rollout:
             # `rollout_rule.percentage` is 0-100.
             # Bucket scale is 0-99999 (multiply by 1000)
             threshold = cumulative + (rollout_rule.percentage * 1000)

@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import UTC, datetime
 from enum import Enum
@@ -55,6 +56,15 @@ class TargetingRuleEntity(DomainEntity):
     value: dict[str, Any] | str | list[Any] | None = None
     serve_variation_id: uuid.UUID
     priority: int = 0
+
+    @model_validator(mode="after")
+    def validate_regex_pattern(self) -> "TargetingRuleEntity":
+        if self.operator == TargetingOperator.MATCHES_REGEX and isinstance(self.value, str):
+            try:
+                re.compile(self.value)
+            except re.error as e:
+                raise ValueError(f"Invalid regex pattern: {self.value}") from e
+        return self
 
 
 class RolloutRuleEntity(DomainEntity):
