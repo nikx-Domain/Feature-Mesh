@@ -7,14 +7,16 @@ from app.domain.entities import (
     FeatureFlagEnvironmentEntity,
 )
 from app.domain.exceptions import DomainException, EntityNotFoundException
+from app.domain.services.cache_service import CacheService
 from app.domain.unit_of_work import UnitOfWork
 
 
 class ToggleFeatureFlagUseCase:
     """Use case to handle enabling or disabling a feature flag in a specific environment."""
 
-    def __init__(self, uow: UnitOfWork) -> None:
+    def __init__(self, uow: UnitOfWork, cache_service: CacheService) -> None:
         self.uow = uow
+        self.cache_service = cache_service
 
     async def execute(
         self,
@@ -56,4 +58,12 @@ class ToggleFeatureFlagUseCase:
                 await self.uow.audit_events.add(audit)
 
             await self.uow.commit()
+
+            if state.is_enabled != is_enabled:
+                try:
+                    await self.cache_service.delete(f"eval_ptr:{environment_id}:{flag.key}")
+                    await self.cache_service.delete_pattern(f"eval_data:{environment_id}:{flag.key}:*")
+                except Exception:
+                    pass
+
             return state

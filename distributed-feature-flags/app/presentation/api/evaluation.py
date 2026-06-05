@@ -4,8 +4,9 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.application.use_cases.evaluate_feature_flag import EvaluateFeatureFlagUseCase
-from app.core.dependencies import get_uow
+from app.core.dependencies import get_cache_service, get_uow
 from app.domain.evaluation.models import EvaluationContext, EvaluationDecision
+from app.domain.services.cache_service import CacheService
 from app.infrastructure.unit_of_work import SQLAlchemyUnitOfWork
 
 router = APIRouter(prefix="/environments", tags=["Evaluation"])
@@ -24,6 +25,7 @@ async def evaluate_flag(
     flag_key: str,
     body: EvaluateRequest,
     uow: SQLAlchemyUnitOfWork = Depends(get_uow),
+    cache_service: CacheService = Depends(get_cache_service),
 ):
     """
     Evaluates a specific feature flag for a given context in a specific environment.
@@ -31,7 +33,7 @@ async def evaluate_flag(
     Note: Standard user authentication is intentionally omitted here to simulate 
     a server-side SDK endpoint. In a real system, this would be secured by an Environment SDK Key.
     """
-    use_case = EvaluateFeatureFlagUseCase(uow)
+    use_case = EvaluateFeatureFlagUseCase(uow, cache_service)
     decision = await use_case.execute(
         environment_id=environment_id,
         flag_key=flag_key,

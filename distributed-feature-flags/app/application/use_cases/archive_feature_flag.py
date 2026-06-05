@@ -7,14 +7,16 @@ from app.domain.entities import (
     FeatureFlagEntity,
 )
 from app.domain.exceptions import EntityNotFoundException
+from app.domain.services.cache_service import CacheService
 from app.domain.unit_of_work import UnitOfWork
 
 
 class ArchiveFeatureFlagUseCase:
     """Use case to handle soft-deleting (archiving) a feature flag."""
 
-    def __init__(self, uow: UnitOfWork) -> None:
+    def __init__(self, uow: UnitOfWork, cache_service: CacheService) -> None:
         self.uow = uow
+        self.cache_service = cache_service
 
     async def execute(
         self,
@@ -45,4 +47,15 @@ class ArchiveFeatureFlagUseCase:
                 await self.uow.audit_events.add(audit)
 
             await self.uow.commit()
+
+            if not flag.is_archived: # Wait, we just set it to True! We should check if we DID archive it.
+                pass
+
+            # Since we just archived it, let's unconditionally invalidate.
+            try:
+                await self.cache_service.delete_pattern(f"eval_ptr:*:{flag.key}")
+                await self.cache_service.delete_pattern(f"eval_data:*:{flag.key}:*")
+            except Exception:
+                pass
+
             return flag

@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 import structlog
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +9,9 @@ from sqlalchemy.sql import text
 from app.core.config import settings
 from app.core.dependencies import get_db
 from app.core.logging import setup_logging
+from app.infrastructure.redis.client import close_redis, get_redis_client, init_redis
 from app.presentation.api.auth import router as auth_router
+from app.presentation.api.cache import router as cache_router
 from app.presentation.api.evaluation import router as evaluation_router
 from app.presentation.api.feature_flags import router as feature_flags_router
 from app.presentation.api.handlers import register_exception_handlers
@@ -18,10 +22,17 @@ from app.presentation.middleware.authorization import JWTAuthorizationMiddleware
 setup_logging()
 logger = structlog.get_logger(__name__)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_redis()
+    yield
+    await close_redis()
+
 app = FastAPI(
     title="Distributed Feature Flag Platform",
     description="Production-grade distributed feature flags control plane backend",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Middleware for cross-origin access configuration
@@ -39,6 +50,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(tenancy_router, prefix="/api/v1")
 app.include_router(feature_flags_router, prefix="/api/v1")
 app.include_router(evaluation_router, prefix="/api/v1")
+app.include_router(cache_router, prefix="/api/v1")
 
 register_exception_handlers(app)
 
@@ -56,9 +68,20 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         logger.error("Database connectivity check failed", error=str(e))
         db_status = "unhealthy"
 
-    status = "healthy" if db_status == "healthy" else "unhealthy"
+    try:
+        redis_client = get_redis_client()
+        await redis_client.ping()
+        redis_status = "healthy"
+    except Exception as e:
+        logger.error("Redis connectivity check failed", error=str(e))
+        redis_status = "unhealthy"
+
+    status = "healthy" if db_status == "healthy" and redis_status == "healthy" else "unhealthy"
     return {
         "status": status,
         "environment": settings.APP_ENV,
-        "services": {"database": db_status},
+        "services": {
+            "database": db_status,
+            "redis": redis_status,
+        },
     }
