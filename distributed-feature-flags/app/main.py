@@ -9,7 +9,7 @@ from sqlalchemy.sql import text
 from app.core.config import settings
 from app.core.dependencies import get_db
 from app.core.logging import setup_logging
-from app.core.database import async_session_maker
+from app.core.database import SessionLocal
 from app.infrastructure.kafka.client import close_kafka_producer, init_kafka_producer
 from app.infrastructure.background.outbox_publisher import outbox_publisher
 from app.infrastructure.kafka.consumers.cache_consumer import CacheInvalidationConsumer
@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
     redis_client = get_redis_client()
     cache_service = CacheService(redis_client)
     cache_consumer = CacheInvalidationConsumer(cache_service)
-    audit_consumer = AuditConsumer(async_session_maker)
+    audit_consumer = AuditConsumer(SessionLocal)
 
     await cache_consumer.start()
     await audit_consumer.start()

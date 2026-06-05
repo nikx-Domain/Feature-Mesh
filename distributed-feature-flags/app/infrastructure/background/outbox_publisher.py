@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.entities import OutboxStatus
 from app.infrastructure.kafka.client import get_kafka_producer
 from app.infrastructure.unit_of_work import SQLAlchemyUnitOfWork
+from app.core.database import SessionLocal
 
 logger = structlog.get_logger(__name__)
 
@@ -88,3 +89,4 @@ class OutboxPublisher:
 
                 await uow.commit()
 
+outbox_publisher = OutboxPublisher(SessionLocal)
