@@ -1,0 +1,88 @@
+import uuid
+from collections.abc import Callable
+from typing import Any
+
+from fastapi import Depends, HTTPException, Request, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+from app.core.dependencies import get_db
+from app.infrastructure.db.models import Role, User
+
+
+async def get_current_user(
+    request: Request, db: AsyncSession = Depends(get_db)
+) -> User:
+    """
+    Dependency to fetch the currently authenticated user from the database.
+    Eagerly loads roles and permissions to avoid greenlet lazy loading errors.
+    """
+    user_payload = getattr(request.state, "user", None)
+    if not user_payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id_str = user_payload.get("sub")
+    if not user_id_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token: Missing sub claim",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        user_id = uuid.UUID(user_id_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication token: Invalid sub format",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    stmt = (
+        select(User)
+        .where(User.id == user_id)
+        .options(selectinload(User.roles).selectinload(Role.permissions))
+    )
+    result = await db.execute(stmt)
+    user = result.scalars().first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is inactive",
+        )
+
+    return user
+
+
+def require_permissions(*permissions: str) -> Callable[..., Any]:
+    """
+    FastAPI dependency factory that returns a dependency enforcing specific permissions.
+    """
+
+    async def dependency(current_user: User = Depends(get_current_user)) -> User:
+        user_permissions = {
+            perm.action for role in current_user.roles for perm in role.permissions
+        }
+
+        for permission in permissions:
+            if permission not in user_permissions:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Forbidden: Missing required permission '{permission}'",
+                )
+        return current_user
+
+    return dependency

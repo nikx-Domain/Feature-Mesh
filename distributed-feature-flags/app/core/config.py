@@ -1,0 +1,37 @@
+from enum import Enum
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class AppEnv(str, Enum):
+    DEVELOPMENT = "development"
+    TESTING = "testing"
+    STAGING = "staging"
+    PRODUCTION = "production"
+
+
+class Settings(BaseSettings):
+    APP_ENV: AppEnv = AppEnv.DEVELOPMENT
+    LOG_LEVEL: str = "info"
+
+    # Database Settings
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres_secure_password"
+    POSTGRES_DB: str = "feature_flags"
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_PORT: int = 5432
+
+    # Defaults to async connection string for the application
+    DATABASE_URL: str = (
+        "postgresql+asyncpg://postgres:postgres_secure_password@localhost:5432/feature_flags"
+    )
+
+    # JWT Settings
+    JWT_SECRET: str = "super_secret_jwt_signing_key_change_me_in_production"
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+
+settings = Settings()
