@@ -246,6 +246,7 @@ class FeatureFlagEnvironment(Base):
     environment_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("environments.id", ondelete="CASCADE"), nullable=False)
     is_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     default_serve_variation_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("flag_variations.id", ondelete="SET NULL"), nullable=True)
+    off_variation_id: Mapped[uuid.UUID | None] = mapped_column(Uuid(as_uuid=True), ForeignKey("flag_variations.id", ondelete="SET NULL"), nullable=True)
     version: Mapped[int] = mapped_column(default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -258,7 +259,8 @@ class FeatureFlagEnvironment(Base):
     # Relationships
     feature_flag: Mapped["FeatureFlag"] = relationship("FeatureFlag", back_populates="environments")
     environment: Mapped["Environment"] = relationship("Environment", back_populates="feature_flag_environments")
-    default_serve_variation: Mapped["FlagVariation | None"] = relationship("FlagVariation")
+    default_serve_variation: Mapped["FlagVariation | None"] = relationship("FlagVariation", foreign_keys=[default_serve_variation_id])
+    off_variation: Mapped["FlagVariation | None"] = relationship("FlagVariation", foreign_keys=[off_variation_id])
     targeting_rules: Mapped[list["TargetingRule"]] = relationship("TargetingRule", back_populates="feature_flag_environment", cascade="all, delete-orphan", lazy="selectin")
     rollout_rules: Mapped[list["RolloutRule"]] = relationship("RolloutRule", back_populates="feature_flag_environment", cascade="all, delete-orphan", lazy="selectin")
 

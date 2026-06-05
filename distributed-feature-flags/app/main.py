@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.dependencies import get_db
 from app.core.logging import setup_logging
 from app.presentation.api.auth import router as auth_router
+from app.presentation.api.evaluation import router as evaluation_router
 from app.presentation.api.feature_flags import router as feature_flags_router
 from app.presentation.api.handlers import register_exception_handlers
 from app.presentation.api.tenancy import router as tenancy_router
@@ -37,6 +38,7 @@ app.add_middleware(JWTAuthorizationMiddleware)
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(tenancy_router, prefix="/api/v1")
 app.include_router(feature_flags_router, prefix="/api/v1")
+app.include_router(evaluation_router, prefix="/api/v1")
 
 register_exception_handlers(app)
 

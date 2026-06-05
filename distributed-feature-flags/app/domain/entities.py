@@ -70,6 +70,7 @@ class FeatureFlagEnvironmentEntity(DomainEntity):
     environment_id: uuid.UUID
     is_enabled: bool = False
     default_serve_variation_id: uuid.UUID | None = None
+    off_variation_id: uuid.UUID | None = None
     version: int = 1
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

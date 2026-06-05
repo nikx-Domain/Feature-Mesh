@@ -63,6 +63,7 @@ class CreateFeatureFlagUseCase:
                     environment_id=env.id,
                     is_enabled=False,
                     default_serve_variation_id=false_var_id,
+                    off_variation_id=false_var_id,
                 )
                 await self.uow.feature_flag_environments.add(state)
 
