@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.dependencies import get_db
 from app.core.logging import setup_logging
 from app.presentation.api.auth import router as auth_router
+from app.presentation.api.tenancy import router as tenancy_router
 from app.presentation.middleware.authorization import JWTAuthorizationMiddleware
 
 # Initialize structured logging configurations
@@ -32,6 +33,7 @@ app.add_middleware(
 app.add_middleware(JWTAuthorizationMiddleware)
 
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(tenancy_router, prefix="/api/v1")
 
 
 @app.get("/health", tags=["Health"])
