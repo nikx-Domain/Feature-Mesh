@@ -15,7 +15,11 @@ from app.application.use_cases.register_user import RegisterUserUseCase
 from app.core.database import Base
 from app.core.dependencies import get_db, get_uow
 from app.core.security import create_access_token
-from app.infrastructure.db.models import Environment, Organization, OrgRole, Project, User, UserOrganization
+from app.infrastructure.db.models import (
+    OrgRole,
+    Project,
+    UserOrganization,
+)
 from app.infrastructure.unit_of_work import SQLAlchemyUnitOfWork
 from app.main import app
 
@@ -327,7 +331,7 @@ def test_environment_endpoints_e2e_and_isolation():
         json={"name": "Project B"},
         headers={"Authorization": f"Bearer {owner_token}", "X-Tenant-ID": org_b_id},
     )
-    proj_b_id = res.json()["id"]
+    _ = res.json()["id"]
 
     # 1. Create Environment in Project A using Org A context -> Success
     headers_org_a = {"Authorization": f"Bearer {owner_token}", "X-Tenant-ID": org_a_id}
@@ -386,7 +390,7 @@ def test_soft_delete_unique_indexes_and_name_reuse():
         async with TestSessionLocal() as db2:
             # Re-fetch project to update it
             proj1_fetched = await db2.get(Project, proj1_id)
-            proj1_fetched.deleted_at = datetime.datetime.now(datetime.timezone.utc)
+            proj1_fetched.deleted_at = datetime.datetime.now(datetime.UTC)
             await db2.commit()
 
         # Third session: Create new project with same name -> Should succeed

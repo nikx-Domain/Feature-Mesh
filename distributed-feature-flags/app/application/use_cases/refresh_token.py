@@ -1,10 +1,8 @@
 import uuid
 
-from fastapi import HTTPException, status
-
 from app.core.security import create_access_token, create_refresh_token, decode_token
+from app.domain.exceptions import AuthenticationException, PermissionDeniedException
 from app.domain.unit_of_work import UnitOfWork
-from app.infrastructure.db.models import User
 
 
 class RefreshTokenUseCase:
@@ -18,43 +16,24 @@ class RefreshTokenUseCase:
         payload = decode_token(refresh_token)
 
         if payload.get("type") != "refresh":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token type: Refresh token required",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            raise AuthenticationException("Invalid token type: Refresh token required")
 
         user_id_str = payload.get("sub")
         if not user_id_str:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token payload: Missing sub claim",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            raise AuthenticationException("Invalid token payload: Missing sub claim")
 
         async with self.uow:
             try:
                 user_id = uuid.UUID(user_id_str)
             except ValueError:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid token payload: Invalid user ID format",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                raise AuthenticationException("Invalid token payload: Invalid user ID format")
 
-            user = await self.uow.session.get(User, user_id)
+            user = await self.uow.users.get_by_id(user_id)
             if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="User not found",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                raise AuthenticationException("User not found")
 
             if not user.is_active:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="User account is inactive",
-                )
+                raise PermissionDeniedException("User account is inactive")
 
             # Issue new token pair
             new_access_token = create_access_token(data={"sub": str(user.id)})

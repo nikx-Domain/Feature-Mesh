@@ -1,10 +1,6 @@
-from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
-
 from app.core.security import create_access_token, create_refresh_token, verify_password
+from app.domain.exceptions import AuthenticationException, PermissionDeniedException
 from app.domain.unit_of_work import UnitOfWork
-from app.infrastructure.db.models import Role, User
 
 
 class LoginUseCase:
@@ -15,33 +11,16 @@ class LoginUseCase:
 
     async def execute(self, email: str, password: str) -> dict:
         async with self.uow:
-            stmt = (
-                select(User)
-                .where(User.email == email)
-                .options(selectinload(User.roles).selectinload(Role.permissions))
-            )
-            result = await self.uow.session.execute(stmt)
-            user = result.scalars().first()
+            user = await self.uow.users.get_by_email(email)
 
             if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid credentials",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                raise AuthenticationException("Invalid credentials")
 
             if not verify_password(password, user.password_hash):
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid credentials",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
+                raise AuthenticationException("Invalid credentials")
 
             if not user.is_active:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="User account is inactive",
-                )
+                raise PermissionDeniedException("User account is inactive")
 
             user_id_str = str(user.id)
             access_token = create_access_token(data={"sub": user_id_str})

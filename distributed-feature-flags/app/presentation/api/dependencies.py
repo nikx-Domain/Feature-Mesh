@@ -2,13 +2,19 @@ import uuid
 from collections.abc import Callable
 from typing import Any
 
-from fastapi import Depends, HTTPException, Request, status, Header
+from fastapi import Depends, Header, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.dependencies import get_db
-from app.infrastructure.db.models import Role, User, Organization, UserOrganization
+from app.domain.exceptions import (
+    AuthenticationException,
+    DomainException,
+    EntityNotFoundException,
+    PermissionDeniedException,
+)
+from app.infrastructure.db.models import Organization, Role, User, UserOrganization
 
 
 async def get_current_user(
@@ -20,28 +26,16 @@ async def get_current_user(
     """
     user_payload = getattr(request.state, "user", None)
     if not user_payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationException("Authentication required")
 
     user_id_str = user_payload.get("sub")
     if not user_id_str:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token: Missing sub claim",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationException("Invalid authentication token: Missing sub claim")
 
     try:
         user_id = uuid.UUID(user_id_str)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication token: Invalid sub format",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationException("Invalid authentication token: Invalid sub format")
 
     stmt = (
         select(User)
@@ -52,17 +46,10 @@ async def get_current_user(
     user = result.scalars().first()
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationException("User not found")
 
     if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is inactive",
-        )
+        raise PermissionDeniedException("User account is inactive")
 
     return user
 
@@ -79,10 +66,7 @@ def require_permissions(*permissions: str) -> Callable[..., Any]:
 
         for permission in permissions:
             if permission not in user_permissions:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Forbidden: Missing required permission '{permission}'",
-                )
+                raise PermissionDeniedException(f"Forbidden: Missing required permission '{permission}'")
         return current_user
 
     return dependency
@@ -101,10 +85,7 @@ async def get_current_tenant(
     try:
         tenant_id = uuid.UUID(x_tenant_id)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid X-Tenant-ID header format: Must be a UUID",
-        )
+        raise DomainException("Invalid X-Tenant-ID header format: Must be a UUID")
 
     membership = None
     for m in current_user.memberships:
@@ -113,10 +94,7 @@ async def get_current_tenant(
             break
 
     if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: Access denied to organization",
-        )
+        raise PermissionDeniedException("Forbidden: Access denied to organization")
 
     stmt = select(Organization).where(
         Organization.id == tenant_id, Organization.deleted_at.is_(None)
@@ -125,10 +103,7 @@ async def get_current_tenant(
     tenant = result.scalars().first()
 
     if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Organization not found",
-        )
+        raise EntityNotFoundException("Organization not found")
 
     request.state.membership_role = membership.role
     return tenant
@@ -147,18 +122,12 @@ def require_org_roles(*roles: str) -> Callable[..., Any]:
         active_role = getattr(request.state, "membership_role", None)
 
         if not active_role or active_role not in roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Forbidden: Insufficient organization privileges",
-            )
+            raise PermissionDeniedException("Forbidden: Insufficient organization privileges")
 
         for m in current_user.memberships:
             if m.organization_id == tenant.id:
                 return m
 
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden: User organization membership not found",
-        )
+        raise PermissionDeniedException("Forbidden: User organization membership not found")
 
     return dependency

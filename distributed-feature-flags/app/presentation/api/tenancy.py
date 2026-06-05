@@ -10,9 +10,20 @@ from app.application.use_cases.create_environment import CreateEnvironmentUseCas
 from app.application.use_cases.create_organization import CreateOrganizationUseCase
 from app.application.use_cases.create_project import CreateProjectUseCase
 from app.core.dependencies import get_db, get_uow
-from app.infrastructure.db.models import Environment, Organization, OrgRole, Project, User, UserOrganization
+from app.infrastructure.db.models import (
+    Environment,
+    Organization,
+    OrgRole,
+    Project,
+    User,
+    UserOrganization,
+)
 from app.infrastructure.unit_of_work import SQLAlchemyUnitOfWork
-from app.presentation.api.dependencies import get_current_tenant, get_current_user, require_org_roles
+from app.presentation.api.dependencies import (
+    get_current_tenant,
+    get_current_user,
+    require_org_roles,
+)
 
 router = APIRouter(prefix="/tenancy", tags=["Tenancy"])
 

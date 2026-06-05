@@ -1,9 +1,8 @@
 import uuid
+
+from app.domain.exceptions import EntityAlreadyExistsException
 from app.domain.unit_of_work import UnitOfWork
 from app.infrastructure.db.models import Project
-from app.infrastructure.repositories.base import SQLAlchemyRepository
-from fastapi import HTTPException, status
-from sqlalchemy import select
 
 
 class CreateProjectUseCase:
@@ -15,25 +14,15 @@ class CreateProjectUseCase:
     async def execute(self, name: str, organization_id: uuid.UUID) -> Project:
         async with self.uow:
             # Check project name uniqueness within the same organization
-            stmt = select(Project).where(
-                Project.organization_id == organization_id,
-                Project.name == name,
-                Project.deleted_at.is_(None),
-            )
-            result = await self.uow.session.execute(stmt)
-            existing_project = result.scalars().first()
+            existing_project = await self.uow.projects.get_by_name_and_org(name, organization_id)
 
-            if existing_project:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Project with this name already exists in the organization",
+            if existing_project and existing_project.deleted_at is None:
+                raise EntityAlreadyExistsException(
+                    "Project with this name already exists in the organization"
                 )
 
             project = Project(name=name, organization_id=organization_id)
-            repo: SQLAlchemyRepository[Project, uuid.UUID] = SQLAlchemyRepository(
-                self.uow.session, Project
-            )
-            await repo.add(project)
+            await self.uow.projects.add(project)
 
             await self.uow.commit()
             return project

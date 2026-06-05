@@ -2,14 +2,33 @@ from abc import ABC, abstractmethod
 from types import TracebackType
 from typing import Any
 
+from app.domain.repositories.environment_repository import EnvironmentRepository
+from app.domain.repositories.organization_repository import OrganizationRepository
+from app.domain.repositories.project_repository import ProjectRepository
+from app.domain.repositories.user_repository import UserRepository
+
 
 class UnitOfWork(ABC):
     """Abstract generic Unit of Work (UOW) context manager interface."""
 
     @property
     @abstractmethod
-    def session(self) -> Any:
-        """Provide access to the underlying persistence session/context."""
+    def users(self) -> UserRepository:
+        pass
+
+    @property
+    @abstractmethod
+    def organizations(self) -> OrganizationRepository:
+        pass
+
+    @property
+    @abstractmethod
+    def projects(self) -> ProjectRepository:
+        pass
+
+    @property
+    @abstractmethod
+    def environments(self) -> EnvironmentRepository:
         pass
 
     async def __aenter__(self) -> "UnitOfWork":

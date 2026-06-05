@@ -2,9 +2,9 @@ from datetime import UTC, datetime, timedelta
 
 import bcrypt
 import jwt
-from fastapi import HTTPException, status
 
 from app.core.config import settings
+from app.domain.exceptions import AuthenticationException
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
@@ -50,20 +50,12 @@ def create_refresh_token(data: dict, expires_delta: timedelta | None = None) -> 
 def decode_token(token: str) -> dict:
     """
     Decode and validate a JWT token.
-    Raises HTTPException 401 if token is expired or invalid.
+    Raises AuthenticationException if token is expired or invalid.
     """
     try:
         payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[ALGORITHM])
         return payload
     except jwt.ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationException("Token has expired")
     except jwt.PyJWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise AuthenticationException("Invalid token")

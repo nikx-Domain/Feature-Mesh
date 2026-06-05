@@ -1,7 +1,7 @@
 import asyncio
 
 import pytest
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, status
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -18,6 +18,11 @@ from app.core.security import (
     decode_token,
     hash_password,
     verify_password,
+)
+from app.domain.exceptions import (
+    AuthenticationException,
+    EntityAlreadyExistsException,
+    PermissionDeniedException,
 )
 from app.infrastructure.db.models import Permission, Role, User
 from app.infrastructure.unit_of_work import SQLAlchemyUnitOfWork
@@ -124,10 +129,9 @@ def test_jwt_token_operations():
 
 
 def test_jwt_invalid_token():
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(AuthenticationException) as exc_info:
         decode_token("invalid.token.value")
-    assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
-    assert exc_info.value.detail == "Invalid token"
+    assert exc_info.value.message == "Invalid token"
 
 
 # ==========================================
@@ -157,9 +161,9 @@ def test_user_registration_and_authentication():
             assert payload["sub"] == str(user.id)
 
             # Authenticate with wrong password
-            with pytest.raises(HTTPException) as exc_info:
+            with pytest.raises(AuthenticationException) as exc_info:
                 await login_use_case.execute("user@test.com", "wrong_pass")
-            assert exc_info.value.status_code == status.HTTP_401_UNAUTHORIZED
+            assert exc_info.value.message == "Invalid credentials"
 
     asyncio.run(test())
 
@@ -171,9 +175,9 @@ def test_register_duplicate_email():
             reg_use_case = RegisterUserUseCase(uow)
             await reg_use_case.execute("dup@test.com", "pass123")
 
-            with pytest.raises(HTTPException) as exc_info:
+            with pytest.raises(EntityAlreadyExistsException) as exc_info:
                 await reg_use_case.execute("dup@test.com", "pass456")
-            assert exc_info.value.status_code == status.HTTP_409_CONFLICT
+            assert exc_info.value.message == "User with this email already exists"
 
     asyncio.run(test())
 
@@ -286,10 +290,10 @@ def test_rbac_decorators():
             res = await create_flag_service(current_user=eager_user)
             assert res == "flag_created"
 
-            # Expect HTTP 403 Forbidden
-            with pytest.raises(HTTPException) as exc_info:
+            # Expect PermissionDeniedException
+            with pytest.raises(PermissionDeniedException) as exc_info:
                 await create_flag_service(current_user=eager_user_no_perm)
-            assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
+            assert exc_info.value.message == "Forbidden: Missing required permission 'flag:create'"
 
     asyncio.run(test())
 
