@@ -9,12 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.entities import OutboxStatus
 from app.infrastructure.kafka.client import get_kafka_producer
 from app.infrastructure.unit_of_work import SQLAlchemyUnitOfWork
-from app.core.database import SessionLocal
-from app.core.metrics import (
-    KAFKA_EVENTS_PUBLISHED_TOTAL,
-    KAFKA_EVENTS_FAILED_TOTAL,
-    OUTBOX_EVENTS_PENDING,
-    OUTBOX_EVENTS_PROCESSED_TOTAL
+from app.observability.kafka_metrics import (
+    kafka_events_published_total,
+    kafka_events_failed_total,
+    outbox_events_pending,
+    outbox_events_processed_total
 )
 
 logger = structlog.get_logger(__name__)
@@ -66,7 +65,7 @@ class OutboxPublisher:
                 # Update pending gauge (approximate via the count of pending fetched + assumes more exist, or we can just count).
                 # To be precise we could count the pending rows, but for performance, we update gauge based on what's fetched.
                 # Actually, gauge is best updated from a real COUNT query if possible, but let's just set it to len(events) for now.
-                OUTBOX_EVENTS_PENDING.set(len(events))
+                outbox_events_pending.set(len(events))
 
                 if not events:
                     return
@@ -91,12 +90,12 @@ class OutboxPublisher:
                         event.processed_at = datetime.now(UTC)
                         await uow.outbox_events.update(event)
                         
-                        KAFKA_EVENTS_PUBLISHED_TOTAL.labels(topic="flag-events").inc()
-                        OUTBOX_EVENTS_PROCESSED_TOTAL.inc()
+                        kafka_events_published_total.labels(topic="flag-events").inc()
+                        outbox_events_processed_total.inc()
                         logger.info("Published outbox event to Kafka", event_id=str(event.id))
 
                     except Exception as e:
-                        KAFKA_EVENTS_FAILED_TOTAL.labels(topic="flag-events").inc()
+                        kafka_events_failed_total.labels(topic="flag-events").inc()
                         logger.error("Failed to publish outbox event", event_id=str(event.id), error=str(e))
                         event.retry_count += 1
                         if event.retry_count > 5:

@@ -9,7 +9,6 @@ from prometheus_client import make_asgi_app
 
 from app.core.config import settings
 from app.core.dependencies import get_db
-from app.core.logging import setup_logging
 from app.core.database import SessionLocal
 from app.infrastructure.kafka.client import close_kafka_producer, init_kafka_producer
 from app.infrastructure.background.outbox_publisher import outbox_publisher
@@ -24,7 +23,10 @@ from app.presentation.api.feature_flags import router as feature_flags_router
 from app.presentation.api.handlers import register_exception_handlers
 from app.presentation.api.tenancy import router as tenancy_router
 from app.presentation.middleware.authorization import JWTAuthorizationMiddleware
-from app.presentation.middleware.observability import ObservabilityMiddleware
+
+from app.observability.logging import setup_logging
+from app.observability.middleware import ObservabilityMiddleware
+from app.observability.metrics import registry
 
 # Initialize structured logging configurations
 setup_logging()
@@ -79,7 +81,7 @@ app.add_middleware(JWTAuthorizationMiddleware)
 app.add_middleware(ObservabilityMiddleware)
 
 # Prometheus metrics
-metrics_app = make_asgi_app()
+metrics_app = make_asgi_app(registry=registry)
 app.mount("/metrics", metrics_app)
 
 app.include_router(auth_router, prefix="/api/v1")

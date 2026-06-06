@@ -2,6 +2,10 @@ import asyncio
 import structlog
 from aiokafka import AIOKafkaConsumer
 from app.core.config import settings
+from app.observability.kafka_metrics import (
+    kafka_consumer_processed_total,
+    kafka_consumer_failures_total,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -52,10 +56,20 @@ class BaseConsumer:
                 msg = await self._consumer.getone()
                 await self.process_message(msg)
                 await self._consumer.commit()
+                kafka_consumer_processed_total.labels(topic=msg.topic).inc()
             except Exception as e:
                 if not self._running:
                     break
                 logger.error("Error processing message", group_id=self.group_id, error=str(e))
+                # We do not have msg.topic guaranteed if getone() fails, but if it failed in process_message we could.
+                # Just use the first topic from self.topics as a fallback if msg is undefined
+                topic = self.topics[0] if self.topics else "unknown"
+                try:
+                    if 'msg' in locals() and hasattr(msg, 'topic'):
+                        topic = msg.topic
+                except:
+                    pass
+                kafka_consumer_failures_total.labels(topic=topic).inc()
                 await asyncio.sleep(1)
 
     async def process_message(self, msg) -> None:

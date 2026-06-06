@@ -3,11 +3,11 @@ from redis.exceptions import RedisError
 
 from app.domain.services.cache_service import CacheService
 from app.infrastructure.redis.client import get_redis_client
-from app.core.metrics import (
-    REDIS_CACHE_HITS_TOTAL,
-    REDIS_CACHE_MISSES_TOTAL,
-    REDIS_CACHE_REBUILDS_TOTAL,
-    REDIS_CACHE_ERRORS_TOTAL
+from app.observability.redis_metrics import (
+    redis_cache_hits_total,
+    redis_cache_misses_total,
+    redis_cache_rebuilds_total,
+    redis_cache_errors_total
 )
 
 logger = structlog.get_logger(__name__)
@@ -21,16 +21,16 @@ class RedisCacheService(CacheService):
             client = get_redis_client()
             value = await client.get(key)
             if isinstance(value, bytes):
-                REDIS_CACHE_HITS_TOTAL.inc()
+                redis_cache_hits_total.inc()
                 return value.decode("utf-8")
             if isinstance(value, str):
-                REDIS_CACHE_HITS_TOTAL.inc()
+                redis_cache_hits_total.inc()
                 return value
             
-            REDIS_CACHE_MISSES_TOTAL.inc()
+            redis_cache_misses_total.inc()
             return None
         except RedisError as e:
-            REDIS_CACHE_ERRORS_TOTAL.labels(action="get").inc()
+            redis_cache_errors_total.labels(action="get").inc()
             logger.error("Redis GET failed", key=key, error=str(e))
             return None
 
@@ -38,9 +38,9 @@ class RedisCacheService(CacheService):
         try:
             client = get_redis_client()
             await client.set(key, value, ex=expire_seconds)
-            REDIS_CACHE_REBUILDS_TOTAL.inc()
+            redis_cache_rebuilds_total.inc()
         except RedisError as e:
-            REDIS_CACHE_ERRORS_TOTAL.labels(action="set").inc()
+            redis_cache_errors_total.labels(action="set").inc()
             logger.error("Redis SET failed", key=key, error=str(e))
 
     async def delete(self, key: str) -> None:
@@ -48,7 +48,7 @@ class RedisCacheService(CacheService):
             client = get_redis_client()
             await client.delete(key)
         except RedisError as e:
-            REDIS_CACHE_ERRORS_TOTAL.labels(action="delete").inc()
+            redis_cache_errors_total.labels(action="delete").inc()
             logger.error("Redis DELETE failed", key=key, error=str(e))
 
     async def exists(self, key: str) -> bool:
@@ -56,12 +56,12 @@ class RedisCacheService(CacheService):
             client = get_redis_client()
             result = await client.exists(key)
             if result:
-                REDIS_CACHE_HITS_TOTAL.inc()
+                redis_cache_hits_total.inc()
             else:
-                REDIS_CACHE_MISSES_TOTAL.inc()
+                redis_cache_misses_total.inc()
             return bool(result)
         except RedisError as e:
-            REDIS_CACHE_ERRORS_TOTAL.labels(action="exists").inc()
+            redis_cache_errors_total.labels(action="exists").inc()
             logger.error("Redis EXISTS failed", key=key, error=str(e))
             return False
 
@@ -72,5 +72,5 @@ class RedisCacheService(CacheService):
             async for key in client.scan_iter(match=pattern, count=100):
                 await client.delete(key)
         except RedisError as e:
-            REDIS_CACHE_ERRORS_TOTAL.labels(action="delete_pattern").inc()
+            redis_cache_errors_total.labels(action="delete_pattern").inc()
             logger.error("Redis DELETE PATTERN failed", pattern=pattern, error=str(e))

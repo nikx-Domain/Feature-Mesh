@@ -8,13 +8,13 @@ from app.domain.evaluation.models import EvaluationContext, EvaluationDecision
 from app.domain.exceptions import EntityNotFoundException
 from app.domain.services.cache_service import CacheService
 from app.domain.unit_of_work import UnitOfWork
-from app.core.metrics import (
-    FEATURE_FLAG_EVALUATIONS_TOTAL,
-    FEATURE_FLAG_EVALUATION_FAILURES_TOTAL,
-    FEATURE_FLAG_TARGETING_MATCHES_TOTAL,
-    FEATURE_FLAG_ROLLOUT_MATCHES_TOTAL,
-    FEATURE_FLAG_DISABLED_TOTAL,
-    EVALUATION_DURATION_SECONDS
+from app.observability.evaluation_metrics import (
+    feature_flag_evaluations_total,
+    feature_flag_evaluation_failures_total,
+    feature_flag_targeting_matches_total,
+    feature_flag_rollout_matches_total,
+    feature_flag_disabled_total,
+    evaluation_duration_seconds
 )
 import time
 
@@ -39,7 +39,7 @@ class EvaluateFeatureFlagUseCase:
         try:
             return await self._execute_internal(environment_id, flag_key, context, start_time)
         except Exception:
-            FEATURE_FLAG_EVALUATION_FAILURES_TOTAL.labels(flag_key=flag_key).inc()
+            feature_flag_evaluation_failures_total.labels(flag_key=flag_key).inc()
             raise
 
     async def _execute_internal(
@@ -124,16 +124,16 @@ class EvaluateFeatureFlagUseCase:
             return decision
 
     def _record_metrics(self, decision: EvaluationDecision, duration: float):
-        EVALUATION_DURATION_SECONDS.labels(flag_key=decision.feature_flag_key).observe(duration)
+        evaluation_duration_seconds.labels(flag_key=decision.feature_flag_key).observe(duration)
         
-        FEATURE_FLAG_EVALUATIONS_TOTAL.labels(
+        feature_flag_evaluations_total.labels(
             flag_key=decision.feature_flag_key, 
             reason=decision.reason
         ).inc()
         
         if decision.reason == "DISABLED":
-            FEATURE_FLAG_DISABLED_TOTAL.labels(flag_key=decision.feature_flag_key).inc()
+            feature_flag_disabled_total.labels(flag_key=decision.feature_flag_key).inc()
         elif decision.reason == "TARGETING_MATCH":
-            FEATURE_FLAG_TARGETING_MATCHES_TOTAL.labels(flag_key=decision.feature_flag_key).inc()
+            feature_flag_targeting_matches_total.labels(flag_key=decision.feature_flag_key).inc()
         elif decision.reason == "ROLLOUT":
-            FEATURE_FLAG_ROLLOUT_MATCHES_TOTAL.labels(flag_key=decision.feature_flag_key).inc()
+            feature_flag_rollout_matches_total.labels(flag_key=decision.feature_flag_key).inc()

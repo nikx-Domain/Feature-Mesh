@@ -7,10 +7,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from starlette.routing import Match
 
-from app.core.metrics import (
-    HTTP_REQUEST_DURATION_SECONDS,
-    HTTP_REQUESTS_TOTAL,
-    HTTP_ERRORS_TOTAL,
+from app.observability.http_metrics import (
+    http_request_duration_seconds,
+    http_requests_total,
+    http_errors_total,
 )
 
 logger = structlog.get_logger(__name__)
@@ -19,14 +19,19 @@ logger = structlog.get_logger(__name__)
 class ObservabilityMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         request_id = str(uuid.uuid4())
+        
+        # Clear contextvars and bind request_id/correlation_id for this async context
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(request_id=request_id)
+        
+        # We can also check for X-Correlation-ID from the client if needed, but for now we default to request_id
+        correlation_id = request.headers.get("X-Correlation-ID", request_id)
+        structlog.contextvars.bind_contextvars(correlation_id=correlation_id)
 
         method = request.method
         
-        # Get path without path parameters if possible to reduce cardinality
-        # E.g. /projects/123 -> /projects/{project_id}
-        # FastAPI resolves routes after some middleware, but we can try to find the route
+        # Attempt to get the matched route path to avoid high cardinality metrics
+        # For example, we want '/projects/{project_id}' instead of '/projects/123e4567'
         route_path = request.url.path
         for route in request.app.routes:
             match, child_scope = route.matches(request.scope)
@@ -34,7 +39,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                 route_path = route.path
                 break
                 
-        # Do not track metrics endpoint to avoid noise
+        # Exclude /metrics from observability tracking to prevent recursive noise
         if route_path == "/metrics":
             return await call_next(request)
 
@@ -44,14 +49,14 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
             status_code = str(response.status_code)
             
-            HTTP_REQUESTS_TOTAL.labels(
+            http_requests_total.labels(
                 method=method, 
                 endpoint=route_path, 
                 status_code=status_code
             ).inc()
             
             if response.status_code >= 500:
-                HTTP_ERRORS_TOTAL.labels(
+                http_errors_total.labels(
                     method=method, 
                     endpoint=route_path
                 ).inc()
@@ -60,12 +65,12 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
 
         except Exception as e:
             status_code = "500"
-            HTTP_REQUESTS_TOTAL.labels(
+            http_requests_total.labels(
                 method=method, 
                 endpoint=route_path, 
                 status_code=status_code
             ).inc()
-            HTTP_ERRORS_TOTAL.labels(
+            http_errors_total.labels(
                 method=method, 
                 endpoint=route_path
             ).inc()
@@ -75,7 +80,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             
         finally:
             duration = time.perf_counter() - start_time
-            HTTP_REQUEST_DURATION_SECONDS.labels(
+            http_request_duration_seconds.labels(
                 method=method, 
                 endpoint=route_path
             ).observe(duration)
