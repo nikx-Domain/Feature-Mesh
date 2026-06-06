@@ -27,8 +27,8 @@ async def test_concurrent_evaluations_deterministic():
         rollout_rules=[rule1, rule2],
     )
     
-    # Pre-generate 1000 contexts
-    contexts = [EvaluationContext(key=f"user_{i}") for i in range(1000)]
+    # Pre-generate 10000 contexts
+    contexts = [EvaluationContext(key=f"user_{i}") for i in range(10000)]
     
     async def evaluate(ctx):
         # We simulate a tiny async sleep if we wanted, but the evaluator is synchronous.
@@ -37,7 +37,7 @@ async def test_concurrent_evaluations_deterministic():
         
     tasks = [evaluate(ctx) for ctx in contexts]
     
-    # Execute all 1000 evaluations concurrently
+    # Execute all 10000 evaluations concurrently
     results = await asyncio.gather(*tasks)
     
     # Since it's deterministic, rerunning the same contexts should yield identical results
@@ -47,6 +47,6 @@ async def test_concurrent_evaluations_deterministic():
     for r1, r2 in zip(results, results_2):
         assert r1.variation_id == r2.variation_id
         
-    # Check 50/50 distribution roughly
+    # Check 50/50 distribution roughly (4800 to 5200 is acceptable deviation for 10k)
     a_count = sum(1 for r in results if r.variation_id == var_a.id)
-    assert 400 <= a_count <= 600
+    assert 4800 <= a_count <= 5200
