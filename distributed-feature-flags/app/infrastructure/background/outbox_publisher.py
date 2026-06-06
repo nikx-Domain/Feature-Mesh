@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.entities import OutboxStatus
 from app.infrastructure.kafka.client import get_kafka_producer
 from app.infrastructure.unit_of_work import SQLAlchemyUnitOfWork
+from app.core.database import SessionLocal
 from app.observability.kafka_metrics import (
     kafka_events_published_total,
     kafka_events_failed_total,

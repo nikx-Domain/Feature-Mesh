@@ -44,6 +44,13 @@ class FeatureFlagUpdate(BaseModel):
     description: str | None = None
 
 
+class FlagVariationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    value: str
+
 class FeatureFlagResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -57,6 +64,7 @@ class FeatureFlagResponse(BaseModel):
     is_archived: bool
     created_at: datetime.datetime
     updated_at: datetime.datetime
+    variations: list[FlagVariationResponse] = []
 
 
 class ToggleFlagRequest(BaseModel):

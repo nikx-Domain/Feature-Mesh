@@ -77,7 +77,7 @@ def test_bootstrap_fail_fast(mock_get):
 
 @patch("sdk.transport.client.httpx.AsyncClient.get")
 def test_background_refresh(mock_get, raw_snapshot_data):
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.json.return_value = raw_snapshot_data
     mock_response.raise_for_status.return_value = None
     mock_get.return_value = mock_response

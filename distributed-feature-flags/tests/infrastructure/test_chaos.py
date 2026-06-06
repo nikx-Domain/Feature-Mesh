@@ -39,7 +39,7 @@ async def test_kafka_timeout_recovery():
     and events are retried automatically until they succeed.
     """
     uow = AsyncMock()
-    event = OutboxEventEntity(topic="flag-events", payload={"test": "data"}, retry_count=0)
+    event = OutboxEventEntity(aggregate_type="test", aggregate_id="123", event_type="flag-events", payload={"test": "data"}, retry_count=0)
     
     # 1. Returns event on first loop, empty on subsequent
     uow.outbox_events.get_pending_events.side_effect = [[event], [event], []]
@@ -56,7 +56,8 @@ async def test_kafka_timeout_recovery():
                 
                 with patch('app.infrastructure.background.outbox_publisher.asyncio.sleep', AsyncMock(side_effect=[None, None, Exception("Stop Loop")])):
                     try:
-                        await outbox_publisher()
+                        outbox_publisher._running = True
+                        await outbox_publisher._run_loop()
                     except Exception as e:
                         assert str(e) == "Stop Loop"
                         
@@ -72,7 +73,7 @@ async def test_sdk_refresh_failure_graceful_degradation(mock_get):
     Tests that an SDK background refresh failure (Network Partition) 
     retains the existing cache and does not crash the client.
     """
-    mock_response = AsyncMock()
+    mock_response = MagicMock()
     mock_response.json.return_value = {
         "environment_id": "env1",
         "flags": {

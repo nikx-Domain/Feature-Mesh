@@ -34,29 +34,26 @@ class FeatureFlagClient:
         if self.config.offline_mode:
             logger.info("Initializing in OFFLINE mode.")
         else:
-            # We perform a one-time async fetch in the main thread's local event loop 
-            # to block startup until we get the first snapshot.
             try:
-                raw_snapshot = asyncio.run(self._bootstrap_fetch())
-                snapshot = parse_snapshot(raw_snapshot)
-                self.store.update_snapshot(snapshot)
+                self.refresh_manager.start()
+                import time
+                for _ in range(20):
+                    if self.refresh_manager._loop is not None:
+                        break
+                    time.sleep(0.05)
+                
+                self.refresh_manager.force_refresh()
+                
+                if not self.store.is_initialized():
+                    raise Exception("Failed to fetch initial snapshot")
+                    
                 logger.info("Successfully bootstrapped local cache.")
             except Exception as e:
                 logger.error(f"Bootstrap failed: {e}")
-                # "fail-fast mode"
+                self.refresh_manager.stop()
                 raise SDKInitializationException("Failed to bootstrap SDK") from e
 
-            # Start background refresh
-            self.refresh_manager.start()
-
         self._is_started = True
-
-    async def _bootstrap_fetch(self):
-        transport = TransportClient(self.config)
-        try:
-            return await transport.get_snapshot()
-        finally:
-            await transport.close()
 
     def shutdown(self) -> None:
         """Gracefully stops background processes."""

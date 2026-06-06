@@ -37,7 +37,7 @@ async def test_outbox_publisher_no_events(mock_uow, mock_session_local, mock_kaf
     # Run a single iteration of the inner loop by mocking the outer loop condition
     with patch('app.infrastructure.background.outbox_publisher.asyncio.sleep', AsyncMock(side_effect=Exception("Stop Loop"))):
         try:
-            await outbox_publisher()
+            await outbox_publisher.publish_pending_events()
         except Exception as e:
             assert str(e) == "Stop Loop"
             
@@ -45,12 +45,12 @@ async def test_outbox_publisher_no_events(mock_uow, mock_session_local, mock_kaf
 
 @pytest.mark.asyncio
 async def test_outbox_publisher_with_events(mock_uow, mock_session_local, mock_kafka_producer):
-    event = OutboxEventEntity(topic="flag-events", payload={"test": "data"})
+    event = OutboxEventEntity(aggregate_type="test", aggregate_id="123", event_type="flag-events", payload={"test": "data"})
     mock_uow.outbox_events.get_pending_events.return_value = [event]
     
     with patch('app.infrastructure.background.outbox_publisher.asyncio.sleep', AsyncMock(side_effect=Exception("Stop Loop"))):
         try:
-            await outbox_publisher()
+            await outbox_publisher.publish_pending_events()
         except Exception as e:
             assert str(e) == "Stop Loop"
             
@@ -61,7 +61,7 @@ async def test_outbox_publisher_with_events(mock_uow, mock_session_local, mock_k
 
 @pytest.mark.asyncio
 async def test_outbox_publisher_kafka_failure_retry(mock_uow, mock_session_local, mock_kafka_producer):
-    event = OutboxEventEntity(topic="flag-events", payload={"test": "data"}, retry_count=0)
+    event = OutboxEventEntity(aggregate_type="test", aggregate_id="123", event_type="flag-events", payload={"test": "data"}, retry_count=0)
     mock_uow.outbox_events.get_pending_events.return_value = [event]
     
     # Simulate Kafka Outage
@@ -69,7 +69,7 @@ async def test_outbox_publisher_kafka_failure_retry(mock_uow, mock_session_local
     
     with patch('app.infrastructure.background.outbox_publisher.asyncio.sleep', AsyncMock(side_effect=Exception("Stop Loop"))):
         try:
-            await outbox_publisher()
+            await outbox_publisher.publish_pending_events()
         except Exception as e:
             assert str(e) == "Stop Loop"
             

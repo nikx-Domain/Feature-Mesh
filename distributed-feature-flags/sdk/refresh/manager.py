@@ -43,10 +43,7 @@ class RefreshManager:
             return
             
         future = asyncio.run_coroutine_threadsafe(self._do_refresh(), self._loop)
-        try:
-            future.result(timeout=self.config.timeout)
-        except Exception as e:
-            logger.error(f"Force refresh failed: {e}")
+        future.result(timeout=self.config.timeout)
 
     def _run_loop(self):
         self._loop = asyncio.new_event_loop()

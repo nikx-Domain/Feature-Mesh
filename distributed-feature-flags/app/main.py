@@ -42,8 +42,9 @@ async def lifespan(app: FastAPI):
     await init_kafka_producer()
     await outbox_publisher.start()
 
+    from app.infrastructure.cache.redis_cache_service import RedisCacheService
     redis_client = get_redis_client()
-    cache_service = CacheService(redis_client)
+    cache_service = RedisCacheService()
     cache_consumer = CacheInvalidationConsumer(cache_service)
     audit_consumer = AuditConsumer(SessionLocal)
 

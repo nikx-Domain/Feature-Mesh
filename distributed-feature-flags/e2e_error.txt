@@ -1,0 +1,108 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.14.3, pytest-9.0.3, pluggy-1.6.0 -- C:\Python314\python.exe
+cachedir: .pytest_cache
+rootdir: A:\Personalized Projects\Distributed Feature Flag platform\distributed-feature-flags
+configfile: pytest.ini
+plugins: anyio-4.13.0, locust-2.44.1, asyncio-1.4.0, cov-7.1.0
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 1 item
+
+tests/e2e/test_api_flows.py::test_full_platform_lifecycle FAILED         [100%]
+ERROR: Coverage failure: total of 50 is less than fail-under=85
+
+
+================================== FAILURES ===================================
+________________________ test_full_platform_lifecycle _________________________
+tests\e2e\test_api_flows.py:14: in test_full_platform_lifecycle
+    async with AsyncClient(app=app, base_url="http://test") as client:
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   TypeError: AsyncClient.__init__() got an unexpected keyword argument 'app'
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.14.3-final-0 _______________
+
+Name                                                         Stmts   Miss  Cover   Missing
+------------------------------------------------------------------------------------------
+app\application\__init__.py                                      0      0   100%
+app\application\decorators.py                                   25     25     0%   1-38
+app\application\services\cache_warmup_service.py                33     24    27%   14-15, 19-53
+app\application\use_cases\archive_feature_flag.py               22     14    36%   17, 25-56
+app\application\use_cases\create_environment.py                 16      9    44%   12, 15-28
+app\application\use_cases\create_feature_flag.py                31     23    26%   20, 32-94
+app\application\use_cases\create_organization.py                15      9    40%   11, 14-29
+app\application\use_cases\create_project.py                     16      9    44%   12, 15-28
+app\application\use_cases\evaluate_feature_flag.py              71     55    23%   28-29, 38-43, 54-124, 127-139
+app\application\use_cases\get_environment_snapshot.py           26     18    31%   12, 15-79
+app\application\use_cases\list_audit_events.py                  12      5    58%   12, 22-28
+app\application\use_cases\login.py                              19     13    32%   10, 13-30
+app\application\use_cases\refresh_token.py                      27     20    26%   12, 16-42
+app\application\use_cases\register_user.py                      17     10    41%   12, 15-29
+app\application\use_cases\toggle_feature_flag.py                26     18    31%   17, 27-68
+app\application\use_cases\update_feature_flag.py                29     21    28%   17, 27-70
+app\core\config.py                                              21      0   100%
+app\core\database.py                                             9      0   100%
+app\core\dependencies.py                                        14      4    71%   17-18, 23, 28
+app\core\security.py                                            38     25    34%   16-17, 22-25, 30-36, 41-47, 55-61
+app\domain\__init__.py                                           0      0   100%
+app\domain\cache\__init__.py                                     0      0   100%
+app\domain\cache\models.py                                       4      0   100%
+app\domain\entities.py                                          91     10    89%   68-73, 99-102
+app\domain\evaluation\__init__.py                                0      0   100%
+app\domain\evaluation\evaluator.py                              38     31    18%   28-32, 41-95
+app\domain\evaluation\hashing.py                                 6      4    33%   13-21
+app\domain\evaluation\models.py                                 15      0   100%
+app\domain\evaluation\operators.py                              45     39    13%   8-10, 14-18, 25-71
+app\domain\events.py                                            18      0   100%
+app\domain\exceptions.py                                        20     10    50%   4-5, 11-12, 18-19, 25-26, 32-33
+app\domain\repositories\base.py                                 21      5    76%   15, 20, 25, 30, 35
+app\domain\repositories\environment_repository.py               12      2    83%   17, 22
+app\domain\repositories\feature_flag_repository.py              38      9    76%   24, 29, 38, 49, 56, 67, 78, 89, 96
+app\domain\repositories\organization_repository.py              15      3    80%   15, 22, 27
+app\domain\repositories\outbox_repository.py                    13      3    77%   10, 14, 18
+app\domain\repositories\project_repository.py                   12      2    83%   17, 22
+app\domain\repositories\user_repository.py                       6      1    83%   12
+app\domain\services\cache_service.py                            17      5    71%   10, 15, 20, 25, 30
+app\domain\unit_of_work.py                                      65     17    74%   25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 78, 86-89, 94, 99
+app\infrastructure\__init__.py                                   0      0   100%
+app\infrastructure\background\outbox_publisher.py               72     50    31%   30-34, 37-44, 47-53, 56-106
+app\infrastructure\cache\redis_cache_service.py                 58     46    21%   20-35, 38-44, 47-52, 55-66, 69-76
+app\infrastructure\db\models.py                                161      0   100%
+app\infrastructure\kafka\client.py                              21     13    38%   13-27, 32-35, 39
+app\infrastructure\kafka\consumers\audit_consumer.py            46     31    33%   18-19, 22-75
+app\infrastructure\kafka\consumers\base.py                      59     47    20%   14-18, 21-37, 40-49, 52-73, 76
+app\infrastructure\kafka\consumers\cache_consumer.py            41     32    22%   12-13, 16-50
+app\infrastructure\redis\client.py                              18     10    44%   15-17, 28-31, 36-38
+app\infrastructure\repositories\base.py                         22      8    64%   17-18, 21, 26, 29, 32-33, 36
+app\infrastructure\repositories\environment_repository.py       17      7    59%   17, 22-26, 29-31
+app\infrastructure\repositories\feature_flag_repository.py     157     99    37%   35, 38-39, 42-43, 46-49, 52-53, 56-57, 60-67, 70-75, 80, 83-84, 87-88, 91-92, 95-96, 99-100, 103-105, 110, 113-115, 118-120, 123-124, 127-128, 131-132, 137-143, 146-148, 153, 156-157, 160-161, 164-165, 168-169, 172-173, 176-180, 185, 188-189, 192-193, 196-197, 200-201, 204-205, 208-212, 217, 220-221, 224-225, 228-229, 232-233, 236-237, 240-244, 247-252
+app\infrastructure\repositories\organization_repository.py      19      8    58%   17, 20-26, 31-36, 39
+app\infrastructure\repositories\outbox_repository.py            26     15    42%   13, 16-28, 31-33, 49-56
+app\infrastructure\repositories\project_repository.py           17      7    59%   17, 22-26, 29-31
+app\infrastructure\repositories\user_repository.py              12      4    67%   14, 17-19
+app\infrastructure\unit_of_work.py                              72     31    57%   35-46, 50, 54, 58, 62, 66, 70, 74, 78, 82, 86, 90, 94, 102-109, 112, 115
+app\main.py                                                     78     32    59%   41-62, 101-118
+app\observability\evaluation_metrics.py                          8      0   100%
+app\observability\http_metrics.py                                5      0   100%
+app\observability\kafka_metrics.py                               7      0   100%
+app\observability\logging.py                                     8      0   100%
+app\observability\metrics.py                                     2      0   100%
+app\observability\middleware.py                                 41     30    27%   21-83
+app\observability\redis_metrics.py                               6      0   100%
+app\presentation\__init__.py                                     0      0   100%
+app\presentation\api\auth.py                                    32      9    72%   52-54, 63-65, 74-76
+app\presentation\api\cache.py                                   14      3    79%   25-27
+app\presentation\api\dependencies.py                            66     50    24%   27-54, 62-72, 85-109, 122-131
+app\presentation\api\evaluation.py                              21      6    71%   37-43, 59-61
+app\presentation\api\feature_flags.py                           77     31    60%   91-98, 101-113, 131-142, 156-160, 178-187, 204-211, 229-238, 255-263
+app\presentation\api\handlers.py                                19      5    74%   16, 25, 34, 43, 52
+app\presentation\api\tenancy.py                                 66     31    53%   80-82, 94-104, 119-121, 133-139, 157-172, 186-205
+app\presentation\middleware\authorization.py                    17     12    29%   15-30
+sdk\__init__.py                                                  4      4     0%   1-5
+sdk\tests\__init__.py                                            0      0   100%
+sdk\tests\test_sdk.py                                           72     72     0%   1-149
+------------------------------------------------------------------------------------------
+TOTAL                                                         2264   1136    50%
+Coverage HTML written to dir htmlcov
+FAIL Required test coverage of 85% not reached. Total coverage: 49.82%
+=========================== short test summary info ===========================
+FAILED tests/e2e/test_api_flows.py::test_full_platform_lifecycle - TypeError:...
+============================== 1 failed in 6.43s ==============================
