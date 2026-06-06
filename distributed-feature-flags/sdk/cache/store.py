@@ -1,34 +1,32 @@
-import threading
 from typing import Optional
 
-from sdk.models.dtos import SDKSnapshotDTO, SDKFeatureFlagDTO
-
+from sdk.models.dtos import SDKSnapshot, SDKFeatureFlag
 
 class FlagStore:
     """
-    Thread-safe in-memory cache for Feature Flags.
+    In-memory cache for Feature Flags.
     
-    Data is replaced atomically by assigning a new reference to self._snapshot,
-    so read operations only need to hold the lock briefly to get the reference,
-    or we can rely on GIL for atomic assignments. However, we use an RLock
-    to be explicit and completely safe across all Python implementations.
+    Reads are completely lock-free. In Python, reference assignment 
+    (e.g., self._snapshot = new_snapshot) is atomic under the GIL.
+    Therefore, updating the snapshot simply involves replacing the reference,
+    and any concurrent reads will either get the old complete snapshot or 
+    the new complete snapshot, without any partial state corruption.
     """
     def __init__(self):
-        self._lock = threading.RLock()
-        self._snapshot: Optional[SDKSnapshotDTO] = None
+        self._snapshot: Optional[SDKSnapshot] = None
 
-    def update_snapshot(self, snapshot: SDKSnapshotDTO) -> None:
-        """Atomically replaces the current snapshot with a new one."""
-        with self._lock:
-            self._snapshot = snapshot
+    def update_snapshot(self, snapshot: SDKSnapshot) -> None:
+        """Atomically replaces the entire snapshot cache."""
+        self._snapshot = snapshot
 
-    def get_flag(self, flag_key: str) -> Optional[SDKFeatureFlagDTO]:
-        """Retrieves a specific flag by key."""
-        with self._lock:
-            if not self._snapshot:
-                return None
-            return self._snapshot.flags.get(flag_key)
+    def get_flag(self, flag_key: str) -> Optional[SDKFeatureFlag]:
+        """Lock-free read of a feature flag."""
+        # Grab a local reference to the snapshot safely
+        snapshot = self._snapshot
+        if not snapshot:
+            return None
+        return snapshot.flags.get(flag_key)
 
     def is_initialized(self) -> bool:
-        with self._lock:
-            return self._snapshot is not None
+        """Lock-free check if the cache is seeded."""
+        return self._snapshot is not None

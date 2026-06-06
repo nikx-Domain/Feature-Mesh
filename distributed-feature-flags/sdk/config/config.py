@@ -4,7 +4,7 @@ from dataclasses import dataclass
 class SDKConfig:
     api_key: str
     base_url: str = "http://localhost:8000"
-    timeout: int = 5
-    refresh_interval: int = 30
-    bootstrap_mode: str = "fail_fast"  # 'fail_fast' or 'graceful'
+    timeout: float = 5.0
+    refresh_interval: float = 30.0
     offline_mode: bool = False
+    bootstrap_timeout: float = 5.0

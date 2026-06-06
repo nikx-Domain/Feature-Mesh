@@ -1,105 +1,114 @@
+import asyncio
 import logging
-from typing import Any
+from typing import Any, Dict, Optional
 
 from sdk.cache.store import FlagStore
 from sdk.config.config import SDKConfig
-from sdk.evaluation.adapter import EvaluationEngineAdapter
-from sdk.exceptions.exceptions import SDKInitializationException, SDKNetworkException
-from sdk.models.dtos import SDKSnapshotDTO
+from sdk.evaluation.engine import LocalEvaluationEngine
+from sdk.exceptions.exceptions import SDKInitializationException
+from sdk.models.dtos import parse_snapshot
+from sdk.refresh.manager import RefreshManager
 from sdk.transport.client import TransportClient
-from sdk.workers.refresh import RefreshManager
 
 logger = logging.getLogger(__name__)
 
-
 class FeatureFlagClient:
     """
-    Main entrypoint for the Feature Flag SDK.
-    Handles bootstrap, refresh lifecycle, and local evaluation.
+    Main entrypoint for the Standalone Feature Flag SDK.
     """
 
     def __init__(self, config: SDKConfig):
         self.config = config
         self.store = FlagStore()
-        self.transport = TransportClient(config)
-        self.refresh_manager = RefreshManager(config, self.store, self.transport)
+        self.refresh_manager = RefreshManager(self.config, self.store)
         self._is_started = False
 
     def start(self) -> None:
         """
-        Initializes the SDK by performing an initial bootstrap load of the flag cache,
-        and then starts the background refresh thread.
+        Initializes the SDK. If offline_mode is False, performs a synchronous-blocking 
+        fetch for the initial snapshot to guarantee safety on startup.
         """
         if self._is_started:
-            logger.warning("FeatureFlagClient is already started.")
             return
 
         if self.config.offline_mode:
-            logger.info("Initializing in OFFLINE mode. No network calls will be made.")
-            # In offline mode, the store remains empty unless populated manually.
+            logger.info("Initializing in OFFLINE mode.")
         else:
+            # We perform a one-time async fetch in the main thread's local event loop 
+            # to block startup until we get the first snapshot.
             try:
-                raw_snapshot = self.transport.get_snapshot()
-                snapshot_dto = SDKSnapshotDTO(**raw_snapshot)
-                self.store.update_snapshot(snapshot_dto)
+                raw_snapshot = asyncio.run(self._bootstrap_fetch())
+                snapshot = parse_snapshot(raw_snapshot)
+                self.store.update_snapshot(snapshot)
                 logger.info("Successfully bootstrapped local cache.")
             except Exception as e:
-                logger.error(f"Failed to bootstrap cache: {e}")
-                if self.config.bootstrap_mode == "fail_fast":
-                    raise SDKInitializationException("Failed to bootstrap SDK") from e
-                else:
-                    logger.warning("Graceful bootstrap mode: continuing with empty cache. "
-                                   "Will retry in background.")
+                logger.error(f"Bootstrap failed: {e}")
+                # "fail-fast mode"
+                raise SDKInitializationException("Failed to bootstrap SDK") from e
 
+            # Start background refresh
             self.refresh_manager.start()
 
         self._is_started = True
 
-    def close(self) -> None:
-        """Stops background threads and cleans up."""
+    async def _bootstrap_fetch(self):
+        transport = TransportClient(self.config)
+        try:
+            return await transport.get_snapshot()
+        finally:
+            await transport.close()
+
+    def shutdown(self) -> None:
+        """Gracefully stops background processes."""
         self.refresh_manager.stop()
         self._is_started = False
 
-    def is_enabled(self, flag_key: str, context: dict[str, Any] | None = None, default: bool = False) -> bool:
-        """
-        Evaluates a boolean feature flag against the given context.
-        """
+    def is_enabled(self, flag_key: str, context: Optional[Dict[str, Any]] = None, default: bool = False) -> bool:
+        """Evaluates a flag purely locally without HTTP requests."""
         context = context or {}
         
         if not self.store.is_initialized():
-            logger.debug(f"SDK cache not initialized, returning default: {default} for {flag_key}")
             return default
 
-        flag_dto = self.store.get_flag(flag_key)
-        if not flag_dto:
-            logger.debug(f"Flag {flag_key} not found in cache, returning default: {default}")
+        flag = self.store.get_flag(flag_key)
+        if not flag:
             return default
 
         try:
-            decision = EvaluationEngineAdapter.evaluate(flag_dto, context)
+            decision = LocalEvaluationEngine.evaluate(flag, context)
             return decision.is_enabled
         except Exception as e:
             logger.error(f"Error evaluating flag {flag_key}: {e}")
             return default
 
-    def get_variation(self, flag_key: str, context: dict[str, Any] | None = None, default: Any = None) -> Any:
-        """
-        Evaluates a multivariate feature flag against the given context and returns the variation value.
-        """
+    def get_variation(self, flag_key: str, context: Optional[Dict[str, Any]] = None, default: Any = None) -> Any:
+        """Evaluates a multivariate flag purely locally."""
         context = context or {}
         
         if not self.store.is_initialized():
-            logger.debug(f"SDK cache not initialized, returning default: {default} for {flag_key}")
             return default
 
-        flag_dto = self.store.get_flag(flag_key)
-        if not flag_dto:
-            logger.debug(f"Flag {flag_key} not found in cache, returning default: {default}")
+        flag = self.store.get_flag(flag_key)
+        if not flag:
             return default
 
         try:
-            decision = EvaluationEngineAdapter.evaluate(flag_dto, context)
+            decision = LocalEvaluationEngine.evaluate(flag, context)
             return decision.variation_value if decision.variation_value is not None else default
         except Exception as e:
             logger.error(f"Error evaluating flag {flag_key}: {e}")
             return default
+
+    def refresh(self) -> None:
+        """Forces an immediate refresh of the snapshot."""
+        self.refresh_manager.force_refresh()
+
+    def health(self) -> str:
+        """Returns the SDK operational status."""
+        if not self._is_started:
+            return "stopped"
+        if self.config.offline_mode:
+            return "offline"
+        if self.store.is_initialized():
+            return "healthy"
+        return "uninitialized"
