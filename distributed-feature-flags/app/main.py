@@ -94,10 +94,16 @@ app.include_router(cache_router, prefix="/api/v1")
 register_exception_handlers(app)
 
 
-@app.get("/health", tags=["Health"])
-async def health_check(db: AsyncSession = Depends(get_db)):
+@app.get("/health/live", tags=["Health"])
+async def health_live():
+    """Liveness probe checking if the API process is running."""
+    return {"status": "alive"}
+
+
+@app.get("/health/ready", tags=["Health"])
+async def health_ready(db: AsyncSession = Depends(get_db)):
     """
-    Health check route validating core API runtime state and PostgreSQL connectivity.
+    Readiness probe validating core API runtime state and external dependencies.
     """
     try:
         # Query database to confirm healthy connection pool
@@ -115,6 +121,10 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         logger.error("Redis connectivity check failed", error=str(e))
         redis_status = "unhealthy"
 
+    from app.infrastructure.kafka.client import get_kafka_producer
+    kafka_producer = get_kafka_producer()
+    kafka_status = "healthy" if kafka_producer is not None else "unhealthy"
+
     status = "healthy" if db_status == "healthy" and redis_status == "healthy" else "unhealthy"
     return {
         "status": status,
@@ -122,5 +132,6 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         "services": {
             "database": db_status,
             "redis": redis_status,
+            "kafka": kafka_status,
         },
     }
