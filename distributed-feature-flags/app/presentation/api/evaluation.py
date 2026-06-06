@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from app.application.use_cases.evaluate_feature_flag import EvaluateFeatureFlagUseCase
+from app.application.use_cases.get_environment_snapshot import GetEnvironmentSnapshotUseCase
 from app.core.dependencies import get_cache_service, get_uow
 from app.domain.evaluation.models import EvaluationContext, EvaluationDecision
 from app.domain.services.cache_service import CacheService
@@ -40,3 +41,21 @@ async def evaluate_flag(
         context=body.context,
     )
     return decision
+
+
+@router.get(
+    "/{environment_id}/snapshot",
+)
+async def get_environment_snapshot(
+    environment_id: uuid.UUID,
+    uow: SQLAlchemyUnitOfWork = Depends(get_uow),
+):
+    """
+    Returns a complete snapshot of all feature flags and their rules for an environment.
+    This is intended to be used by Server-Side SDKs to build a local cache for offline evaluation.
+    
+    Note: Authentication is omitted to simulate a server-side SDK endpoint.
+    """
+    use_case = GetEnvironmentSnapshotUseCase(uow)
+    snapshot = await use_case.execute(environment_id=environment_id)
+    return snapshot
