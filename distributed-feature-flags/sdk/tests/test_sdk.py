@@ -119,7 +119,7 @@ def test_evaluation_engine_local_logic(raw_snapshot_data):
     client.shutdown()
 
 
-def test_thread_safety():
+def test_thread_safety(raw_snapshot_data):
     config = SDKConfig(api_key="test", offline_mode=True)
     client = FeatureFlagClient(config)
     client.start()
@@ -128,8 +128,18 @@ def test_thread_safety():
         for _ in range(100):
             client.is_enabled("test_flag")
             
+    def write_flags():
+        for i in range(20):
+            snap = parse_snapshot(raw_snapshot_data)
+            # Add some entropy to force re-evaluation of object size
+            snap.flags["test_flag"].version = i
+            client.store.update_snapshot(snap)
+            
     import threading
-    threads = [threading.Thread(target=read_flags) for _ in range(10)]
+    read_threads = [threading.Thread(target=read_flags) for _ in range(10)]
+    write_threads = [threading.Thread(target=write_flags) for _ in range(2)]
+    
+    threads = read_threads + write_threads
     
     for t in threads:
         t.start()
