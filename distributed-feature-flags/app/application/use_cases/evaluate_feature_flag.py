@@ -8,6 +8,15 @@ from app.domain.evaluation.models import EvaluationContext, EvaluationDecision
 from app.domain.exceptions import EntityNotFoundException
 from app.domain.services.cache_service import CacheService
 from app.domain.unit_of_work import UnitOfWork
+from app.core.metrics import (
+    FEATURE_FLAG_EVALUATIONS_TOTAL,
+    FEATURE_FLAG_EVALUATION_FAILURES_TOTAL,
+    FEATURE_FLAG_TARGETING_MATCHES_TOTAL,
+    FEATURE_FLAG_ROLLOUT_MATCHES_TOTAL,
+    FEATURE_FLAG_DISABLED_TOTAL,
+    EVALUATION_DURATION_SECONDS
+)
+import time
 
 logger = structlog.get_logger(__name__)
 
@@ -24,6 +33,21 @@ class EvaluateFeatureFlagUseCase:
         environment_id: uuid.UUID,
         flag_key: str,
         context: EvaluationContext,
+    ) -> EvaluationDecision:
+        
+        start_time = time.perf_counter()
+        try:
+            return await self._execute_internal(environment_id, flag_key, context, start_time)
+        except Exception:
+            FEATURE_FLAG_EVALUATION_FAILURES_TOTAL.labels(flag_key=flag_key).inc()
+            raise
+
+    async def _execute_internal(
+        self,
+        environment_id: uuid.UUID,
+        flag_key: str,
+        context: EvaluationContext,
+        start_time: float,
     ) -> EvaluationDecision:
 
         # --- Redis Primary Read Path ---
@@ -45,6 +69,7 @@ class EvaluateFeatureFlagUseCase:
                     )
                     decision.metadata["cache_hit"] = True
                     decision.metadata["version"] = version_str
+                    self._record_metrics(decision, time.perf_counter() - start_time)
                     return decision
                 except Exception as e:
                     logger.error("Failed to parse cached evaluation data", error=str(e))
@@ -95,4 +120,20 @@ class EvaluateFeatureFlagUseCase:
             except Exception as e:
                 logger.error("Failed to write to cache during rebuild", error=str(e))
 
+            self._record_metrics(decision, time.perf_counter() - start_time)
             return decision
+
+    def _record_metrics(self, decision: EvaluationDecision, duration: float):
+        EVALUATION_DURATION_SECONDS.labels(flag_key=decision.feature_flag_key).observe(duration)
+        
+        FEATURE_FLAG_EVALUATIONS_TOTAL.labels(
+            flag_key=decision.feature_flag_key, 
+            reason=decision.reason
+        ).inc()
+        
+        if decision.reason == "DISABLED":
+            FEATURE_FLAG_DISABLED_TOTAL.labels(flag_key=decision.feature_flag_key).inc()
+        elif decision.reason == "TARGETING_MATCH":
+            FEATURE_FLAG_TARGETING_MATCHES_TOTAL.labels(flag_key=decision.feature_flag_key).inc()
+        elif decision.reason == "ROLLOUT":
+            FEATURE_FLAG_ROLLOUT_MATCHES_TOTAL.labels(flag_key=decision.feature_flag_key).inc()

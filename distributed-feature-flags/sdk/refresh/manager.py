@@ -81,7 +81,18 @@ class RefreshManager:
             snapshot = parse_snapshot(raw_data)
             self.store.update_snapshot(snapshot)
             logger.debug("Successfully refreshed local cache via background thread.")
+            
+            if self.config.metrics_reporter:
+                self.config.metrics_reporter.increment("sdk_snapshot_refresh_total", {"status": "success"})
+                self.config.metrics_reporter.increment("sdk_cache_replacements_total")
+                
         except SDKNetworkException as e:
+            if self.config.metrics_reporter:
+                self.config.metrics_reporter.increment("sdk_snapshot_refresh_total", {"status": "error"})
+                self.config.metrics_reporter.increment("sdk_snapshot_refresh_failures_total")
             logger.error(f"Background refresh failed (network): {e}")
         except Exception as e:
+            if self.config.metrics_reporter:
+                self.config.metrics_reporter.increment("sdk_snapshot_refresh_total", {"status": "error"})
+                self.config.metrics_reporter.increment("sdk_snapshot_refresh_failures_total")
             logger.exception(f"Unexpected error during background refresh: {e}")

@@ -76,6 +76,8 @@ class FeatureFlagClient:
 
         try:
             decision = LocalEvaluationEngine.evaluate(flag, context)
+            if self.config.metrics_reporter:
+                self.config.metrics_reporter.increment("sdk_evaluations_total", {"flag_key": flag_key})
             return decision.is_enabled
         except Exception as e:
             logger.error(f"Error evaluating flag {flag_key}: {e}")
@@ -94,6 +96,8 @@ class FeatureFlagClient:
 
         try:
             decision = LocalEvaluationEngine.evaluate(flag, context)
+            if self.config.metrics_reporter:
+                self.config.metrics_reporter.increment("sdk_evaluations_total", {"flag_key": flag_key})
             return decision.variation_value if decision.variation_value is not None else default
         except Exception as e:
             logger.error(f"Error evaluating flag {flag_key}: {e}")

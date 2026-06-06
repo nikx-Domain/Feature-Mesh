@@ -1,4 +1,9 @@
 from dataclasses import dataclass
+from typing import Optional, Protocol, Dict, Any
+
+class MetricsReporter(Protocol):
+    def increment(self, metric_name: str, labels: Optional[Dict[str, str]] = None) -> None:
+        ...
 
 @dataclass
 class SDKConfig:
@@ -8,3 +13,4 @@ class SDKConfig:
     refresh_interval: float = 30.0
     offline_mode: bool = False
     bootstrap_timeout: float = 5.0
+    metrics_reporter: Optional[MetricsReporter] = None

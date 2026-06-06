@@ -5,6 +5,7 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
+from prometheus_client import make_asgi_app
 
 from app.core.config import settings
 from app.core.dependencies import get_db
@@ -23,6 +24,7 @@ from app.presentation.api.feature_flags import router as feature_flags_router
 from app.presentation.api.handlers import register_exception_handlers
 from app.presentation.api.tenancy import router as tenancy_router
 from app.presentation.middleware.authorization import JWTAuthorizationMiddleware
+from app.presentation.middleware.observability import ObservabilityMiddleware
 
 # Initialize structured logging configurations
 setup_logging()
@@ -74,6 +76,11 @@ app.add_middleware(
 )
 
 app.add_middleware(JWTAuthorizationMiddleware)
+app.add_middleware(ObservabilityMiddleware)
+
+# Prometheus metrics
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(tenancy_router, prefix="/api/v1")
