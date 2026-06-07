@@ -32,8 +32,9 @@ class Settings(BaseSettings):
     # Kafka
     KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
 
-    # JWT Settings
-    JWT_SECRET: str = "super_secret_jwt_signing_key_change_me_in_production"
+    # JWT Settings (RS256)
+    JWT_PRIVATE_KEY: str = ""
+    JWT_PUBLIC_KEY: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"

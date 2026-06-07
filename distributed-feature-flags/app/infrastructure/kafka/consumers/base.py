@@ -6,6 +6,7 @@ from app.observability.kafka_metrics import (
     kafka_consumer_processed_total,
     kafka_consumer_failures_total,
 )
+from app.infrastructure.kafka.client import send_kafka_message
 
 logger = structlog.get_logger(__name__)
 
@@ -54,22 +55,40 @@ class BaseConsumer:
         while self._running:
             try:
                 msg = await self._consumer.getone()
-                await self.process_message(msg)
+                
+                max_retries = 3
+                success = False
+                for attempt in range(max_retries):
+                    try:
+                        await self.process_message(msg)
+                        success = True
+                        break
+                    except Exception as e:
+                        logger.warning("Message processing failed, retrying", attempt=attempt, error=str(e))
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(2 ** attempt)
+                
+                if not success:
+                    logger.error("Message failed after max retries, sending to DLQ", topic=msg.topic)
+                    # Send to DLQ
+                    await send_kafka_message(
+                        topic="dead_letter_events",
+                        value=msg.value,
+                        key=msg.key,
+                        headers=[
+                            ("original_topic", msg.topic.encode("utf-8")),
+                            ("group_id", self.group_id.encode("utf-8")),
+                        ]
+                    )
+                    kafka_consumer_failures_total.labels(topic=msg.topic).inc()
+                else:
+                    kafka_consumer_processed_total.labels(topic=msg.topic).inc()
+
                 await self._consumer.commit()
-                kafka_consumer_processed_total.labels(topic=msg.topic).inc()
             except Exception as e:
                 if not self._running:
                     break
-                logger.error("Error processing message", group_id=self.group_id, error=str(e))
-                # We do not have msg.topic guaranteed if getone() fails, but if it failed in process_message we could.
-                # Just use the first topic from self.topics as a fallback if msg is undefined
-                topic = self.topics[0] if self.topics else "unknown"
-                try:
-                    if 'msg' in locals() and hasattr(msg, 'topic'):
-                        topic = msg.topic
-                except:
-                    pass
-                kafka_consumer_failures_total.labels(topic=topic).inc()
+                logger.error("Consumer loop error", group_id=self.group_id, error=str(e))
                 await asyncio.sleep(1)
 
     async def process_message(self, msg) -> None:

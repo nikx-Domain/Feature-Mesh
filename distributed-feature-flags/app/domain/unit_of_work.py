@@ -14,6 +14,7 @@ from app.domain.repositories.organization_repository import OrganizationReposito
 from app.domain.repositories.project_repository import ProjectRepository
 from app.domain.repositories.user_repository import UserRepository
 from app.domain.repositories.outbox_repository import OutboxEventRepository
+from app.domain.repositories.refresh_token_repository import RefreshTokenRepository
 
 
 class UnitOfWork(ABC):
@@ -72,6 +73,11 @@ class UnitOfWork(ABC):
     @property
     @abstractmethod
     def outbox_events(self) -> OutboxEventRepository:
+        pass
+
+    @property
+    @abstractmethod
+    def refresh_tokens(self) -> RefreshTokenRepository:
         pass
 
     async def __aenter__(self) -> "UnitOfWork":

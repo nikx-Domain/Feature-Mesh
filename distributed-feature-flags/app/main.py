@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 
 import structlog
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql import text
@@ -23,6 +23,9 @@ from app.presentation.api.feature_flags import router as feature_flags_router
 from app.presentation.api.handlers import register_exception_handlers
 from app.presentation.api.tenancy import router as tenancy_router
 from app.presentation.middleware.authorization import JWTAuthorizationMiddleware
+from app.presentation.api.rate_limit import limiter
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from app.observability.logging import setup_logging
 from app.observability.middleware import ObservabilityMiddleware
@@ -69,6 +72,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # Middleware for cross-origin access configuration
 app.add_middleware(
     CORSMiddleware,
@@ -80,6 +86,16 @@ app.add_middleware(
 
 app.add_middleware(JWTAuthorizationMiddleware)
 app.add_middleware(ObservabilityMiddleware)
+
+@app.middleware("http")
+async def secure_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=()"
+    return response
 
 # Prometheus metrics
 metrics_app = make_asgi_app(registry=registry)

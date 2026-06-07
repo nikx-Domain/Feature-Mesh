@@ -2,6 +2,7 @@ import structlog
 from aiokafka import AIOKafkaProducer
 
 from app.core.config import settings
+from app.infrastructure.resilience import kafka_circuit_breaker
 
 logger = structlog.get_logger(__name__)
 
@@ -37,3 +38,9 @@ async def close_kafka_producer() -> None:
 
 def get_kafka_producer() -> AIOKafkaProducer | None:
     return _producer
+
+@kafka_circuit_breaker
+async def send_kafka_message(topic: str, value: bytes, key: bytes | None = None, headers: list[tuple[str, bytes]] | None = None) -> None:
+    if _producer is None:
+        raise RuntimeError("Kafka producer not initialized")
+    await _producer.send_and_wait(topic, value=value, key=key, headers=headers)

@@ -85,6 +85,12 @@ class User(Base):
         cascade="all, delete-orphan",
         lazy="selectin"
     )
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
+        "RefreshToken",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin"
+    )
 
 
 class Role(Base):
@@ -334,3 +340,15 @@ class ProcessedKafkaEvent(Base):
 
     event_id: Mapped[str] = mapped_column(String(100), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    jti: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(Uuid(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+
+    user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")

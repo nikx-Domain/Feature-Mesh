@@ -7,7 +7,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.entities import OutboxStatus
-from app.infrastructure.kafka.client import get_kafka_producer
+from app.infrastructure.kafka.client import get_kafka_producer, send_kafka_message
 from app.infrastructure.unit_of_work import SQLAlchemyUnitOfWork
 from app.core.database import SessionLocal
 from app.observability.kafka_metrics import (
@@ -77,7 +77,7 @@ class OutboxPublisher:
                         payload_bytes = payload_str.encode("utf-8")
                         key_bytes = event.aggregate_id.encode("utf-8")
 
-                        await producer.send_and_wait(
+                        await send_kafka_message(
                             topic="flag-events",
                             value=payload_bytes,
                             key=key_bytes,

@@ -26,6 +26,8 @@ from app.infrastructure.repositories.project_repository import (
     SQLAlchemyProjectRepository,
 )
 from app.infrastructure.repositories.user_repository import SQLAlchemyUserRepository
+from app.infrastructure.repositories.refresh_token_repository import SQLAlchemyRefreshTokenRepository
+from app.infrastructure.resilience import db_circuit_breaker
 
 
 class SQLAlchemyUnitOfWork(UnitOfWork):
@@ -44,6 +46,7 @@ class SQLAlchemyUnitOfWork(UnitOfWork):
         self._rollout_rules = SQLAlchemyRolloutRuleRepository(session)
         self._audit_events = SQLAlchemyAuditEventRepository(session)
         self._outbox_events = SQLAlchemyOutboxEventRepository(session)
+        self._refresh_tokens = SQLAlchemyRefreshTokenRepository(session)
 
     @property
     def users(self) -> UserRepository:
@@ -89,6 +92,10 @@ class SQLAlchemyUnitOfWork(UnitOfWork):
     def outbox_events(self):
         return self._outbox_events
 
+    @property
+    def refresh_tokens(self):
+        return self._refresh_tokens
+
 
     async def __aenter__(self) -> "SQLAlchemyUnitOfWork":
         return self
@@ -108,6 +115,7 @@ class SQLAlchemyUnitOfWork(UnitOfWork):
         finally:
             await self._session.close()
 
+    @db_circuit_breaker
     async def commit(self) -> None:
         await self._session.commit()
 

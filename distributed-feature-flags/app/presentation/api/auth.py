@@ -1,7 +1,8 @@
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Request
 from pydantic import BaseModel, ConfigDict, EmailStr
+from app.presentation.api.rate_limit import limiter
 
 from app.application.use_cases.login import LoginUseCase
 from app.application.use_cases.refresh_token import RefreshTokenUseCase
@@ -55,7 +56,9 @@ async def register(
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     body: LoginRequest,
     uow: SQLAlchemyUnitOfWork = Depends(get_uow),
 ):
@@ -66,7 +69,9 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
+@limiter.limit("10/minute")
 async def refresh(
+    request: Request,
     body: RefreshRequest,
     uow: SQLAlchemyUnitOfWork = Depends(get_uow),
 ):

@@ -16,9 +16,16 @@ from app.domain.exceptions import (
 )
 from app.infrastructure.db.models import Organization, Role, User, UserOrganization
 
+from fastapi import Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer(auto_error=False)
+
 
 async def get_current_user(
-    request: Request, db: AsyncSession = Depends(get_db)
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Security(security),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
     """
     Dependency to fetch the currently authenticated user from the database.
